@@ -1,5 +1,6 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from .models import CustomUser, GeoTag, Family, Medicine, Note, Reminder, ReminderStatus
 from .serializers import (
@@ -133,7 +134,7 @@ class GeoTagViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
         if user.geotag:
-            raise serializers.ValidationError("GeoTag already exists. Use PUT to update.")
+            raise ValidationError("GeoTag already exists. Use PUT to update.")
         geotag = serializer.save()
         user.geotag = geotag
         user.save()
@@ -289,7 +290,7 @@ class NoteViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         if instance.creator != self.request.user:
-            raise PermissionError("You can only delete your own notes.")
+            raise PermissionDenied("You can only delete your own notes.")
         instance.delete()
 
     @action(detail=False, methods=['get'], url_path='mine')

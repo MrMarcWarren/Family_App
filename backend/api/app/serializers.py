@@ -191,10 +191,13 @@ class ReminderSerializer(serializers.ModelSerializer):
         assigned_to_list = validated_data.pop('assigned_to', [])
         reminder = Reminder.objects.create(**validated_data)
 
-        # Add assignees and create a status for each
+        # Default to creator if no assignees specified
+        if not assigned_to_list:
+            assigned_to_list = [reminder.creator]
+
         for user in assigned_to_list:
             reminder.assigned_to.add(user)
-            ReminderStatus.objects.create(reminder=reminder, user=user)
+            ReminderStatus.objects.get_or_create(reminder=reminder, user=user)
 
         return reminder
 

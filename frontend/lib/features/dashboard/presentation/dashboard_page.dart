@@ -47,7 +47,10 @@ class _DashboardPageState extends State<DashboardPage> {
             (results[2].data as List).map((n) => Note.fromJson(n)).toList();
       });
     } on DioException catch (_) {
-      // silently fail — page shows graceful fallbacks
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load data. Is the server running?')),
+      );
     }
   }
 
@@ -443,7 +446,7 @@ class MedicationReminderPanel extends StatelessWidget {
 
       // Parse the scheduled time - assuming formattedScheduledTime is in "HH:mm" format
       try {
-        final timeParts = medicine.formattedScheduledTime.split(':');
+        final timeParts = medicine.scheduledTime.split(':');
         final scheduledTime = DateTime(
           now.year,
           now.month,

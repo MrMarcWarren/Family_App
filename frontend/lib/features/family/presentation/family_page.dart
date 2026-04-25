@@ -67,7 +67,7 @@ class _FamilyPageState extends State<FamilyPage> {
 
   Future<void> _toggleEmergency() async {
     try {
-      final res = await ApiClient.instance.patch('/users/emergency/toggle');
+      final res = await ApiClient.instance.patch('/users/emergency/toggle/');
       final isOn = res.data['in_emergency'] as bool? ?? false;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -188,7 +188,12 @@ void _showFamilyProfileModal(
           Navigator.of(dialogContext).pop();
           onCheckOn();
         },
-        onAddReminder: () => Navigator.of(dialogContext).pop(),
+        onAddReminder: () {
+          Navigator.of(dialogContext).pop();
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const ReminderPage()),
+          );
+        },
       );
     },
   );
@@ -226,7 +231,9 @@ class FamilyHeader extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         IconButton(
-          onPressed: () {},
+          onPressed: () => Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const SettingsPage()),
+          ),
           icon: const CircleAvatar(
             radius: 14,
             backgroundColor: Colors.white,

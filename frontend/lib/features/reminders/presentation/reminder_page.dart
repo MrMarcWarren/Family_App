@@ -213,7 +213,9 @@ class ReminderHeader extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         IconButton(
-          onPressed: () {},
+          onPressed: () => Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const SettingsPage()),
+          ),
           icon: const CircleAvatar(
             radius: 14,
             backgroundColor: Colors.white,
