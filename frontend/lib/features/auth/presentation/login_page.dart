@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'family_registration_pages.dart';
 import 'widgets/tahanan_logo.dart';
 
 class LoginPage extends StatefulWidget {
@@ -102,12 +103,24 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 12),
                       _OutlineActionButton(
                         label: 'Join an Existing Family',
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const JoinFamilyPage(),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 10),
                       _OutlineActionButton(
                         label: 'Create a Family',
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const CreateFamilyPage(),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 10),
                     ],

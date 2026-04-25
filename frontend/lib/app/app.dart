@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../features/auth/presentation/login_page.dart';
 
@@ -21,9 +22,12 @@ class FamilyApp extends StatelessWidget {
           secondary: const Color(0xFFF5D6D6),
           surface: Colors.white,
         ),
-        textTheme: const TextTheme(
-          bodyMedium: TextStyle(color: Colors.white),
+        textTheme:
+            GoogleFonts.interTextTheme(ThemeData.light().textTheme).apply(
+          bodyColor: Colors.white,
+          displayColor: Colors.white,
         ),
+        fontFamily: GoogleFonts.inter().fontFamily,
       ),
       home: const LoginPage(),
     );

@@ -2,27 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class TahananLogo extends StatelessWidget {
-  const TahananLogo({super.key});
+  const TahananLogo({
+    super.key,
+    this.imageSize = 165,
+    this.labelFontSize = 32,
+    this.labelSpacing = 6,
+  });
+
+  final double imageSize;
+  final double labelFontSize;
+  final double labelSpacing;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         SizedBox(
-          height: 165,
-          width: 165,
+          height: imageSize,
+          width: imageSize,
           child: const Image(
             image: AssetImage('assets/images/logos/tahanan_logo.png'),
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: labelSpacing),
         Text(
           'TAHANAN',
           style: GoogleFonts.dynaPuff(
             color: Color(0xFFFFEFEF),
-            fontSize: 32,
+            fontSize: labelFontSize,
             fontWeight: FontWeight.w900,
             letterSpacing: 3.8,
             shadows: const [
