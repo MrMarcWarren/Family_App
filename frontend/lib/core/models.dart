@@ -84,6 +84,7 @@ class Medicine {
   final String scheduledTime;
   final bool isOverdue;
   final String? skipMessage;
+  final String? lastTakenAt;
 
   Medicine({
     required this.id,
@@ -92,6 +93,7 @@ class Medicine {
     required this.scheduledTime,
     required this.isOverdue,
     this.skipMessage,
+    this.lastTakenAt,
   });
 
   factory Medicine.fromJson(Map<String, dynamic> json) {
@@ -102,7 +104,34 @@ class Medicine {
       scheduledTime: json['scheduled_time'] ?? '',
       isOverdue: json['is_overdue'] ?? false,
       skipMessage: json['skip_message'],
+      lastTakenAt: json['last_taken_at'],
     );
+  }
+
+  String get formattedScheduledTime {
+    try {
+      final parts = scheduledTime.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = parts[1];
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final h = hour % 12 == 0 ? 12 : hour % 12;
+      return '$h:$minute $period';
+    } catch (_) {
+      return scheduledTime;
+    }
+  }
+
+  bool get takenToday {
+    if (lastTakenAt == null) return false;
+    try {
+      final taken = DateTime.parse(lastTakenAt!).toLocal();
+      final now = DateTime.now();
+      return taken.year == now.year &&
+          taken.month == now.month &&
+          taken.day == now.day;
+    } catch (_) {
+      return false;
+    }
   }
 }
 
@@ -137,6 +166,41 @@ class Reminder {
       return '$hour:$minute $period';
     } catch (_) {
       return remindAt;
+    }
+  }
+}
+
+class Note {
+  final int id;
+  final String creator;
+  final String content;
+  final String createdAt;
+
+  Note({
+    required this.id,
+    required this.creator,
+    required this.content,
+    required this.createdAt,
+  });
+
+  factory Note.fromJson(Map<String, dynamic> json) {
+    return Note(
+      id: json['id'],
+      creator: json['creator']?.toString() ?? '',
+      content: json['content'] ?? '',
+      createdAt: json['created_at'] ?? '',
+    );
+  }
+
+  String get formattedTime {
+    try {
+      final dt = DateTime.parse(createdAt).toLocal();
+      final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final minute = dt.minute.toString().padLeft(2, '0');
+      final period = dt.hour >= 12 ? 'PM' : 'AM';
+      return '$hour:$minute $period';
+    } catch (_) {
+      return '';
     }
   }
 }

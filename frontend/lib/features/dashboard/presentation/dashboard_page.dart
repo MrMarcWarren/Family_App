@@ -8,6 +8,7 @@ import '../../../core/token_store.dart';
 import '../../auth/presentation/login_page.dart';
 import '../../family/presentation/family_page.dart';
 import '../../reminders/presentation/reminder_page.dart';
+import '../../settings/presentation/settings_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -22,6 +23,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   AppUser? _user;
   List<Medicine> _medicines = [];
+  List<Note> _notes = [];
 
   @override
   void initState() {
@@ -34,6 +36,7 @@ class _DashboardPageState extends State<DashboardPage> {
       final results = await Future.wait([
         ApiClient.instance.get('/users/me/'),
         ApiClient.instance.get('/medicines/'),
+        ApiClient.instance.get('/notes/'),
       ]);
       if (!mounted) return;
       setState(() {
@@ -41,9 +44,24 @@ class _DashboardPageState extends State<DashboardPage> {
         _medicines = (results[1].data as List)
             .map((m) => Medicine.fromJson(m))
             .toList();
+        _notes = (results[2].data as List)
+            .map((n) => Note.fromJson(n))
+            .toList();
       });
     } on DioException catch (_) {
       // silently fail — page shows graceful fallbacks
+    }
+  }
+
+  Future<void> _markMedicineTaken(int medicineId) async {
+    try {
+      await ApiClient.instance.patch('/medicines/$medicineId/take/');
+      await _loadData();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ApiClient.extractError(e))),
+      );
     }
   }
 
@@ -91,6 +109,7 @@ class _DashboardPageState extends State<DashboardPage> {
           backgroundColor: Color(0xFFE94E4D),
         ),
       );
+      await _loadData();
     } on DioException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -176,7 +195,12 @@ class _DashboardPageState extends State<DashboardPage> {
                   onMoodPressed: _updateMood,
                 ),
                 const SizedBox(height: 14),
-                MedicationReminderPanel(medicine: medicine),
+                MedicationReminderPanel(
+                  medicine: medicine,
+                  onMarkTaken: medicine != null
+                      ? () => _markMedicineTaken(medicine.id)
+                      : null,
+                ),
                 const SizedBox(height: 14),
                 QuickMessagePanel(
                   controller: messageController,
@@ -185,6 +209,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   },
                   onSendPressed: () => _sendMessage(messageController.text),
                 ),
+                const SizedBox(height: 14),
+                FamilyNotesFeedPanel(notes: _notes),
               ],
             ),
           ),
@@ -203,6 +229,12 @@ class _DashboardPageState extends State<DashboardPage> {
           if (index == 2) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (context) => const ReminderPage()),
+            );
+            return;
+          }
+          if (index == 3) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const SettingsPage()),
             );
             return;
           }
@@ -266,11 +298,11 @@ class MoodCheckInPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const moods = [
-      _MoodData('sad', 'Sad', Icons.sentiment_dissatisfied, Color(0xFF9FA2D5)),
-      _MoodData('happy', 'Happy', Icons.sentiment_satisfied, Color(0xFF9AA272)),
-      _MoodData('excited', 'Excited', Icons.celebration, Color(0xFFE5CF7B)),
-      _MoodData('crying', 'Crying', Icons.sentiment_very_dissatisfied, Color(0xFF7BA2D5)),
-      _MoodData('angry', 'Angry', Icons.mood_bad, Color(0xFFE57373)),
+      MoodData('sad', 'Sad', Icons.sentiment_dissatisfied, Color(0xFF9FA2D5)),
+      MoodData('happy', 'Happy', Icons.sentiment_satisfied, Color(0xFF9AA272)),
+      MoodData('excited', 'Excited', Icons.celebration, Color(0xFFE5CF7B)),
+      MoodData('crying', 'Crying', Icons.sentiment_very_dissatisfied, Color(0xFF7BA2D5)),
+      MoodData('angry', 'Angry', Icons.mood_bad, Color(0xFFE57373)),
     ];
 
     return Card(
@@ -324,7 +356,7 @@ class MoodItem extends StatelessWidget {
     this.isSelected = false,
   });
 
-  final _MoodData data;
+  final MoodData data;
   final VoidCallback onPressed;
   final bool isSelected;
 
@@ -366,8 +398,8 @@ class MoodItem extends StatelessWidget {
   }
 }
 
-class _MoodData {
-  const _MoodData(this.value, this.label, this.icon, this.color);
+class MoodData {
+  const MoodData(this.value, this.label, this.icon, this.color);
 
   final String value;
   final String label;
@@ -376,9 +408,14 @@ class _MoodData {
 }
 
 class MedicationReminderPanel extends StatelessWidget {
-  const MedicationReminderPanel({super.key, this.medicine});
+  const MedicationReminderPanel({
+    super.key,
+    this.medicine,
+    this.onMarkTaken,
+  });
 
   final Medicine? medicine;
+  final VoidCallback? onMarkTaken;
 
   @override
   Widget build(BuildContext context) {
@@ -408,7 +445,7 @@ class MedicationReminderPanel extends StatelessWidget {
             if (medicine != null) ...[
               const SizedBox(height: 6),
               Text(
-                'Take at ${medicine!.scheduledTime}',
+                'Take at ${medicine!.formattedScheduledTime}',
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   color: const Color(0xFF4A4A4A),
@@ -436,6 +473,39 @@ class MedicationReminderPanel extends StatelessWidget {
                   ),
                 ),
               ],
+              if (!medicine!.takenToday) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: onMarkTaken,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE94E4D),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Mark as Taken',
+                      style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+                  ),
+                ),
+              ],
+              if (medicine!.takenToday)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    'Taken today',
+                    style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: Colors.green,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
             ],
           ],
         ),
@@ -565,6 +635,86 @@ class _QuickPresetButton extends StatelessWidget {
         child: Text(
           label,
           style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16),
+        ),
+      ),
+    );
+  }
+}
+
+class FamilyNotesFeedPanel extends StatelessWidget {
+  const FamilyNotesFeedPanel({super.key, required this.notes});
+
+  final List<Note> notes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: const Color(0xFFFFFFFF),
+      elevation: 2,
+      shadowColor: const Color(0x26000000),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Family Notes',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF111111),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (notes.isEmpty)
+              Text(
+                'No messages yet.',
+                style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF9F9F9F)),
+              )
+            else
+              ...notes.take(5).map(
+                    (note) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Color(0xFFE94E4D),
+                            child: Icon(Icons.person, color: Colors.white, size: 16),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  note.creator,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF444444),
+                                  ),
+                                ),
+                                Text(
+                                  note.content,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 13, color: const Color(0xFF222222)),
+                                ),
+                                Text(
+                                  note.formattedTime,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 11, color: const Color(0xFF9F9F9F)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+          ],
         ),
       ),
     );

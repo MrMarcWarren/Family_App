@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
+from django.core import exceptions as django_exceptions
 from .models import CustomUser, Family, GeoTag, Medicine, Note, Reminder, ReminderStatus
 
 class GeoTagSerializer(serializers.ModelSerializer):
@@ -71,7 +72,7 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'date_joined', 'mood_updated_at', 'checked_on']
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    password = serializers.CharField(write_only=True, required=True)
     password2 = serializers.CharField(write_only=True, required=True)
     geotag = GeoTagSerializer(required=False)
 
@@ -82,7 +83,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             'first_name', 'last_name',
             'phone', 'birthday',
             'mood', 'in_emergency', 'is_adult',
-            'family',
             'geotag',
             'password', 'password2'
         ]
@@ -90,6 +90,18 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password": "Passwords do not match."})
+        # Validate password strength with full user context so
+        # UserAttributeSimilarityValidator can compare against username/email.
+        user = CustomUser(
+            username=attrs.get('username', ''),
+            email=attrs.get('email', ''),
+            first_name=attrs.get('first_name', ''),
+            last_name=attrs.get('last_name', ''),
+        )
+        try:
+            validate_password(attrs['password'], user=user)
+        except django_exceptions.ValidationError as e:
+            raise serializers.ValidationError({'password': list(e.messages)})
         return attrs
 
     def create(self, validated_data):
@@ -97,9 +109,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password')
         geotag_data = validated_data.pop('geotag', None)
 
-        user = CustomUser(**validated_data)
-        user.set_password(password)
-        user.save()
+        user = CustomUser.objects.create_user(
+            username=validated_data.pop('username'),
+            email=validated_data.pop('email', ''),
+            password=password,
+            **validated_data,
+        )
 
         if geotag_data:
             geotag = GeoTag.objects.create(**geotag_data)

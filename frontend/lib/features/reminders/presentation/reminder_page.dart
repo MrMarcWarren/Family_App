@@ -6,6 +6,7 @@ import '../../../core/api_client.dart';
 import '../../../core/models.dart';
 import '../../dashboard/presentation/dashboard_page.dart';
 import '../../family/presentation/family_page.dart';
+import '../../settings/presentation/settings_page.dart';
 
 class ReminderPage extends StatefulWidget {
   const ReminderPage({super.key});
@@ -57,6 +58,30 @@ class _ReminderPageState extends State<ReminderPage> {
     }
   }
 
+  Future<void> _markDone(int id) async {
+    try {
+      await ApiClient.instance.patch('/reminders/$id/done/');
+      await _loadData();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ApiClient.extractError(e))),
+      );
+    }
+  }
+
+  Future<void> _dismiss(int id) async {
+    try {
+      await ApiClient.instance.patch('/reminders/$id/dismiss/');
+      await _loadData();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ApiClient.extractError(e))),
+      );
+    }
+  }
+
   Future<void> _addReminder(String title, String notes, DateTime dateTime,
       int? assignedUserId) async {
     try {
@@ -92,6 +117,8 @@ class _ReminderPageState extends State<ReminderPage> {
               children: [
                 ReminderPanel(
                   reminders: _reminders,
+                  onDone: _markDone,
+                  onDismiss: _dismiss,
                   onAddReminderPressed: () {
                     showDialog<void>(
                       context: context,
@@ -129,6 +156,12 @@ class _ReminderPageState extends State<ReminderPage> {
           if (index == 1) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (context) => const FamilyPage()),
+            );
+            return;
+          }
+          if (index == 3) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const SettingsPage()),
             );
             return;
           }
@@ -184,10 +217,14 @@ class ReminderPanel extends StatelessWidget {
     super.key,
     required this.reminders,
     required this.onAddReminderPressed,
+    this.onDone,
+    this.onDismiss,
   });
 
   final List<Reminder> reminders;
   final VoidCallback onAddReminderPressed;
+  final ValueChanged<int>? onDone;
+  final ValueChanged<int>? onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -218,9 +255,12 @@ class ReminderPanel extends StatelessWidget {
                   padding: EdgeInsets.only(
                       bottom: index == reminders.length - 1 ? 0 : 14),
                   child: ReminderCardSection(
+                    reminderId: reminder.id,
                     title: reminder.title,
                     contentHint: reminder.description ?? '',
                     timeText: 'Time: ${reminder.formattedTime}',
+                    onDone: onDone != null ? () => onDone!(reminder.id) : null,
+                    onDismiss: onDismiss != null ? () => onDismiss!(reminder.id) : null,
                   ),
                 );
               }),
@@ -252,14 +292,20 @@ class ReminderPanel extends StatelessWidget {
 class ReminderCardSection extends StatelessWidget {
   const ReminderCardSection({
     super.key,
+    required this.reminderId,
     required this.title,
     required this.contentHint,
     required this.timeText,
+    this.onDone,
+    this.onDismiss,
   });
 
+  final int reminderId;
   final String title;
   final String contentHint;
   final String timeText;
+  final VoidCallback? onDone;
+  final VoidCallback? onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -292,6 +338,52 @@ class ReminderCardSection extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
                 color: const Color(0xFF454545))),
+        if (onDone != null || onDismiss != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              if (onDone != null)
+                Expanded(
+                  child: SizedBox(
+                    height: 36,
+                    child: ElevatedButton(
+                      onPressed: onDone,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE94E4D),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        textStyle: GoogleFonts.inter(
+                            fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      child: const Text('Done'),
+                    ),
+                  ),
+                ),
+              if (onDone != null && onDismiss != null)
+                const SizedBox(width: 8),
+              if (onDismiss != null)
+                Expanded(
+                  child: SizedBox(
+                    height: 36,
+                    child: OutlinedButton(
+                      onPressed: onDismiss,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF9F9F9F),
+                        side: const BorderSide(color: Color(0xFFCFCFCF)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        textStyle: GoogleFonts.inter(
+                            fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      child: const Text('Dismiss'),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }

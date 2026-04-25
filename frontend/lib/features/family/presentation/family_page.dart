@@ -8,6 +8,7 @@ import '../../../core/api_client.dart';
 import '../../../core/models.dart';
 import '../../dashboard/presentation/dashboard_page.dart';
 import '../../reminders/presentation/reminder_page.dart';
+import '../../settings/presentation/settings_page.dart';
 
 class FamilyPage extends StatefulWidget {
   const FamilyPage({super.key});
@@ -19,7 +20,6 @@ class FamilyPage extends StatefulWidget {
 class _FamilyPageState extends State<FamilyPage> {
   int selectedTabIndex = 1;
   List<FamilyMember> _members = [];
-  int? _familyId;
 
   @override
   void initState() {
@@ -37,7 +37,6 @@ class _FamilyPageState extends State<FamilyPage> {
           await ApiClient.instance.get('/families/${user.familyId}/members/');
       if (!mounted) return;
       setState(() {
-        _familyId = user.familyId;
         _members = (membersRes.data as List)
             .map((m) => FamilyMember.fromJson(m))
             .toList();
@@ -65,6 +64,26 @@ class _FamilyPageState extends State<FamilyPage> {
     }
   }
 
+  Future<void> _toggleEmergency() async {
+    try {
+      final res = await ApiClient.instance.patch('/users/emergency/toggle');
+      final isOn = res.data['in_emergency'] as bool? ?? false;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              isOn ? 'Emergency alert activated!' : 'Emergency alert deactivated.'),
+          backgroundColor: isOn ? Colors.red : const Color(0xFFE94E4D),
+        ),
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ApiClient.extractError(e))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -74,6 +93,8 @@ class _FamilyPageState extends State<FamilyPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 138),
         children: [
+          _EmergencyAlertPanel(onToggle: _toggleEmergency),
+          const SizedBox(height: 12),
           FamilyMembersPanel(members: _members),
           const SizedBox(height: 12),
           FamilyMapPanel(members: _members),
@@ -97,6 +118,12 @@ class _FamilyPageState extends State<FamilyPage> {
           if (index == 2) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (context) => const ReminderPage()),
+            );
+            return;
+          }
+          if (index == 3) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const SettingsPage()),
             );
             return;
           }
@@ -203,10 +230,6 @@ class FamilyMembersPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayMembers = members.isEmpty
-        ? List.generate(5, (i) => null)
-        : members;
-
     return Card(
       color: Colors.white,
       elevation: 2,
@@ -226,17 +249,20 @@ class FamilyMembersPanel extends StatelessWidget {
             members.isEmpty
                 ? Text(
                     'No family members yet.',
-                    style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF9F9F9F)),
+                    style:
+                        GoogleFonts.inter(fontSize: 13, color: const Color(0xFF9F9F9F)),
                   )
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: members.map((member) {
-                      final color = _moodColors[member.mood] ?? const Color(0xFFD5D5D5);
+                      final color =
+                          _moodColors[member.mood] ?? const Color(0xFFD5D5D5);
                       return Expanded(
                         child: Column(
                           children: [
                             GestureDetector(
-                              onTap: () => _showFamilyProfileModal(context, member, () {}),
+                              onTap: () =>
+                                  _showFamilyProfileModal(context, member, () {}),
                               child: Stack(
                                 alignment: Alignment.bottomLeft,
                                 children: [
@@ -611,6 +637,61 @@ class _ModalActionButton extends StatelessWidget {
               GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
         ),
         child: Text(label),
+      ),
+    );
+  }
+}
+
+class _EmergencyAlertPanel extends StatelessWidget {
+  const _EmergencyAlertPanel({required this.onToggle});
+
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      shadowColor: const Color(0x22000000),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Emergency Alert',
+              style: GoogleFonts.inter(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF4A4A4A)),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Press to alert your family that you need help.',
+              style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF7B7B7B)),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton.icon(
+                onPressed: onToggle,
+                icon: const Icon(Icons.warning_amber_rounded),
+                label: Text('Toggle Emergency',
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700, fontSize: 15)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
