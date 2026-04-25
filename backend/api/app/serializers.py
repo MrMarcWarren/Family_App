@@ -119,31 +119,12 @@ class ChangePasswordSerializer(serializers.Serializer):
         return attrs
 
 class NoteSerializer(serializers.ModelSerializer):
-    sender = serializers.StringRelatedField(read_only=True)
-    receiver = serializers.StringRelatedField(read_only=True)
-    receiver_id = serializers.PrimaryKeyRelatedField(
-        queryset=CustomUser.objects.all(),
-        source='receiver',
-        write_only=True
-    )
+    creator = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = Note
-        fields = ['id', 'sender', 'receiver', 'receiver_id', 'content', 'is_read', 'created_at']
-        read_only_fields = ['id', 'sender', 'is_read', 'created_at']
-
-    def validate_receiver_id(self, receiver):
-        sender = self.context['request'].user
-
-        # Cannot send note to yourself
-        if receiver == sender:
-            raise serializers.ValidationError("You cannot send a note to yourself.")
-
-        # Receiver must be in the same family
-        if receiver.family != sender.family:
-            raise serializers.ValidationError("You can only send notes to family members.")
-
-        return receiver
+        fields = ['id', 'creator', 'content', 'created_at']
+        read_only_fields = ['id', 'creator', 'created_at']
 
 class ReminderStatusSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)

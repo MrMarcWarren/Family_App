@@ -36,9 +36,8 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(Note)
 class NoteAdmin(admin.ModelAdmin):
-    list_display = ['sender', 'receiver', 'content', 'is_read', 'created_at']
-    list_filter = ['is_read']
-    search_fields = ['sender__username', 'receiver__username', 'content']
+    list_display = ['creator', 'content', 'created_at']
+    search_fields = ['creator__username', 'content']
 
 @admin.register(Reminder)
 class ReminderAdmin(admin.ModelAdmin):

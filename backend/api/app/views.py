@@ -233,57 +233,30 @@ class FamilyViewSet(viewsets.ModelViewSet):
 class NoteViewSet(viewsets.ModelViewSet):
     serializer_class = NoteSerializer
     permission_classes = [permissions.IsAuthenticated]
-    http_method_names = ['get', 'post', 'delete']   # no put/patch — notes are immutable
+    http_method_names = ['get', 'post', 'delete']   # no editing — notes are immutable
 
     def get_queryset(self):
         user = self.request.user
-        # Returns all notes sent or received by the user
-        return Note.objects.filter(
-            sender=user
-        ) | Note.objects.filter(
-            receiver=user
-        ).select_related('sender', 'receiver')
+        # All family members can read all notes within the family
+        if user.family:
+            return Note.objects.filter(
+                creator__family=user.family
+            ).select_related('creator')
+        # No family — only see your own notes
+        return Note.objects.filter(creator=user).select_related('creator')
 
     def perform_create(self, serializer):
-        serializer.save(sender=self.request.user)
+        serializer.save(creator=self.request.user)
 
     def perform_destroy(self, instance):
-        user = self.request.user
-        if instance.sender != user:
+        if instance.creator != self.request.user:
             raise PermissionError("You can only delete your own notes.")
         instance.delete()
 
-    # GET /api/notes/inbox/
-    @action(detail=False, methods=['get'], url_path='inbox')
-    def inbox(self, request):
-        notes = Note.objects.filter(receiver=request.user).select_related('sender')
-        serializer = NoteSerializer(notes, many=True, context={'request': request})
-        return Response(serializer.data)
-
-    # GET /api/notes/sent/
-    @action(detail=False, methods=['get'], url_path='sent')
-    def sent(self, request):
-        notes = Note.objects.filter(sender=request.user).select_related('receiver')
-        serializer = NoteSerializer(notes, many=True, context={'request': request})
-        return Response(serializer.data)
-
-    # PATCH /api/notes/{id}/read/
-    @action(detail=True, methods=['patch'], url_path='read')
-    def mark_read(self, request, pk=None):
-        note = self.get_object()
-        if note.receiver != request.user:
-            return Response(
-                {"error": "You can only mark your own received notes as read."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        note.is_read = True
-        note.save()
-        return Response({"message": "Note marked as read.", "is_read": True})
-
-    # GET /api/notes/unread/
-    @action(detail=False, methods=['get'], url_path='unread')
-    def unread(self, request):
-        notes = Note.objects.filter(receiver=request.user, is_read=False).select_related('sender')
+    # GET /api/notes/mine/
+    @action(detail=False, methods=['get'], url_path='mine')
+    def mine(self, request):
+        notes = Note.objects.filter(creator=request.user)
         serializer = NoteSerializer(notes, many=True, context={'request': request})
         return Response(serializer.data)
 
