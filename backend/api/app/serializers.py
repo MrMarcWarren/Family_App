@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import CustomUser, Family, GeoTag
+from .models import CustomUser, Family, GeoTag, Note
 
 class GeoTagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -118,3 +118,29 @@ class ChangePasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError({"new_password": "Passwords do not match."})
         return attrs
 
+class NoteSerializer(serializers.ModelSerializer):
+    sender = serializers.StringRelatedField(read_only=True)
+    receiver = serializers.StringRelatedField(read_only=True)
+    receiver_id = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.all(),
+        source='receiver',
+        write_only=True
+    )
+
+    class Meta:
+        model = Note
+        fields = ['id', 'sender', 'receiver', 'receiver_id', 'content', 'is_read', 'created_at']
+        read_only_fields = ['id', 'sender', 'is_read', 'created_at']
+
+    def validate_receiver_id(self, receiver):
+        sender = self.context['request'].user
+
+        # Cannot send note to yourself
+        if receiver == sender:
+            raise serializers.ValidationError("You cannot send a note to yourself.")
+
+        # Receiver must be in the same family
+        if receiver.family != sender.family:
+            raise serializers.ValidationError("You can only send notes to family members.")
+
+        return receiver

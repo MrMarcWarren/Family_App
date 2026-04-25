@@ -44,3 +44,16 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.username
+
+class Note(models.Model):
+    sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='sent_notes')
+    receiver = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='received_notes')
+    content = models.CharField(max_length=280)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.sender.username} → {self.receiver.username}: {self.content[:30]}"
+
+    class Meta:
+        ordering = ['-created_at']
