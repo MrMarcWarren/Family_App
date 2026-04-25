@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'family_registration_pages.dart';
+import '../../dashboard/presentation/dashboard_page.dart';
 import 'widgets/tahanan_logo.dart';
 
 class LoginPage extends StatefulWidget {
@@ -73,7 +74,13 @@ class _LoginPageState extends State<LoginPage> {
                       SizedBox(
                         height: 42,
                         child: ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (context) => const DashboardPage(),
+                              ),
+                            );
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: const Color(0xFFF63C3C),
