@@ -29,7 +29,6 @@ class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Admins see all users, regular users see only themselves
         if self.request.user.is_staff:
             return CustomUser.objects.all().select_related('geotag')
         return CustomUser.objects.filter(pk=self.request.user.pk).select_related('geotag')
@@ -46,7 +45,6 @@ class UserViewSet(viewsets.ModelViewSet):
             return [permissions.IsAdminUser()]
         return [permissions.IsAuthenticated()]
 
-    # PATCH /api/users/change-password/
     @action(detail=False, methods=['patch'], url_path='change-password')
     def change_password(self, request):
         serializer = ChangePasswordSerializer(data=request.data)
@@ -62,7 +60,6 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({"message": "Password changed successfully."})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # PATCH /api/users/emergency/toggle/
     @action(detail=False, methods=['patch'], url_path='emergency/toggle')
     def emergency_toggle(self, request):
         user = request.user
@@ -73,7 +70,6 @@ class UserViewSet(viewsets.ModelViewSet):
             "in_emergency": user.in_emergency
         })
 
-    # GET /api/users/emergency/list/
     @action(detail=False, methods=['get'], url_path='emergency/list',
             permission_classes=[permissions.IsAdminUser])
     def emergency_list(self, request):
@@ -81,7 +77,6 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
-    # GET /api/users/me/
     @action(detail=False, methods=['get', 'put', 'patch'], url_path='me')
     def me(self, request):
         user = request.user
@@ -93,7 +88,7 @@ class UserViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @action(detail=True, methods=['patch'], url_path='check-on')
     def check_on(self, request, pk=None):
         target_user = self.get_object()
@@ -113,9 +108,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
         target_user.checked_on = True
         target_user.save()
-
-        return Response({"message": "Checked on successfully."})   # ← no info revealed
-
+        return Response({"message": "Checked on successfully."})
 
     @action(detail=False, methods=['patch'], url_path='dismiss-check-on')
     def dismiss_check_on(self, request):
@@ -124,16 +117,17 @@ class UserViewSet(viewsets.ModelViewSet):
         user.save()
         return Response({"message": "Check-on dismissed.", "checked_on": False})
 
+
 class GeoTagViewSet(viewsets.ModelViewSet):
     serializer_class = GeoTagSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return GeoTag.objects.all().select_related('user')  # ← all users see all geotags
+        return GeoTag.objects.all().select_related('user')
 
     def get_permissions(self):
         if self.action == 'destroy':
-            return [permissions.IsAdminUser()]   # only admin can delete
+            return [permissions.IsAdminUser()]
         return [permissions.IsAuthenticated()]
 
     def perform_create(self, serializer):
@@ -178,17 +172,20 @@ class GeoTagViewSet(viewsets.ModelViewSet):
             user.save()
             return Response({"message": "GeoTag removed successfully."}, status=status.HTTP_204_NO_CONTENT)
 
+
 class FamilyViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
-        # Use detailed serializer for retrieve, list; simple for others
         if self.action in ['retrieve', 'list', 'members', 'emergency']:
             return FamilyDetailSerializer
         return FamilySerializer
 
     def get_queryset(self):
         user = self.request.user
+        name_query = self.request.query_params.get('name')
+        if name_query:
+            return Family.objects.filter(name__icontains=name_query).prefetch_related('members')
         if user.is_staff:
             return Family.objects.all().prefetch_related('members')
         if user.family:
@@ -200,13 +197,11 @@ class FamilyViewSet(viewsets.ModelViewSet):
             return [permissions.IsAdminUser()]
         return [permissions.IsAuthenticated()]
 
-    # POST /api/families/{id}/add-member/
     @action(detail=True, methods=['post'], url_path='add-member')
     def add_member(self, request, pk=None):
         family = self.get_object()
         user = request.user
 
-        # Only adults or staff can add members
         if not user.is_staff and not user.is_adult:
             return Response(
                 {"error": "Only adults can add members."},
@@ -222,7 +217,6 @@ class FamilyViewSet(viewsets.ModelViewSet):
         member.save()
         return Response({"message": f"{member.username} added to {family.name}."})
 
-    # POST /api/families/{id}/remove-member/
     @action(detail=True, methods=['post'], url_path='remove-member')
     def remove_member(self, request, pk=None):
         family = self.get_object()
@@ -243,7 +237,6 @@ class FamilyViewSet(viewsets.ModelViewSet):
         member.save()
         return Response({"message": f"{member.username} removed from {family.name}."})
 
-    # GET /api/families/{id}/members/
     @action(detail=True, methods=['get'], url_path='members')
     def members(self, request, pk=None):
         family = self.get_object()
@@ -251,7 +244,6 @@ class FamilyViewSet(viewsets.ModelViewSet):
         serializer = FamilyMemberSerializer(members, many=True)
         return Response(serializer.data)
 
-    # POST /api/families/{id}/join/
     @action(detail=True, methods=['post'], url_path='join')
     def join(self, request, pk=None):
         user = request.user
@@ -271,7 +263,6 @@ class FamilyViewSet(viewsets.ModelViewSet):
         user.save()
         return Response({"message": f"You have joined {family.name}."})
 
-    # GET /api/families/{id}/emergency/
     @action(detail=True, methods=['get'], url_path='emergency')
     def emergency(self, request, pk=None):
         family = self.get_object()
@@ -279,19 +270,18 @@ class FamilyViewSet(viewsets.ModelViewSet):
         serializer = FamilyMemberSerializer(members, many=True)
         return Response(serializer.data)
 
+
 class NoteViewSet(viewsets.ModelViewSet):
     serializer_class = NoteSerializer
     permission_classes = [permissions.IsAuthenticated]
-    http_method_names = ['get', 'post', 'delete']   # no editing — notes are immutable
+    http_method_names = ['get', 'post', 'delete']
 
     def get_queryset(self):
         user = self.request.user
-        # All family members can read all notes within the family
         if user.family:
             return Note.objects.filter(
                 creator__family=user.family
             ).select_related('creator')
-        # No family — only see your own notes
         return Note.objects.filter(creator=user).select_related('creator')
 
     def perform_create(self, serializer):
@@ -302,12 +292,12 @@ class NoteViewSet(viewsets.ModelViewSet):
             raise PermissionError("You can only delete your own notes.")
         instance.delete()
 
-    # GET /api/notes/mine/
     @action(detail=False, methods=['get'], url_path='mine')
     def mine(self, request):
         notes = Note.objects.filter(creator=request.user)
         serializer = NoteSerializer(notes, many=True, context={'request': request})
         return Response(serializer.data)
+
 
 class ReminderViewSet(viewsets.ModelViewSet):
     serializer_class = ReminderSerializer
@@ -324,7 +314,6 @@ class ReminderViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(creator=self.request.user)
 
-    # GET /api/reminders/mine/
     @action(detail=False, methods=['get'], url_path='mine')
     def mine(self, request):
         reminders = Reminder.objects.filter(
@@ -333,7 +322,6 @@ class ReminderViewSet(viewsets.ModelViewSet):
         serializer = ReminderSerializer(reminders, many=True, context={'request': request})
         return Response(serializer.data)
 
-    # GET /api/reminders/created/
     @action(detail=False, methods=['get'], url_path='created')
     def created(self, request):
         reminders = Reminder.objects.filter(
@@ -342,7 +330,6 @@ class ReminderViewSet(viewsets.ModelViewSet):
         serializer = ReminderSerializer(reminders, many=True, context={'request': request})
         return Response(serializer.data)
 
-    # GET /api/reminders/pending/
     @action(detail=False, methods=['get'], url_path='pending')
     def pending(self, request):
         reminders = Reminder.objects.filter(
@@ -353,7 +340,6 @@ class ReminderViewSet(viewsets.ModelViewSet):
         serializer = ReminderSerializer(reminders, many=True, context={'request': request})
         return Response(serializer.data)
 
-    # PATCH /api/reminders/{id}/done/
     @action(detail=True, methods=['patch'], url_path='done')
     def mark_done(self, request, pk=None):
         reminder = self.get_object()
@@ -371,7 +357,6 @@ class ReminderViewSet(viewsets.ModelViewSet):
         reminder_status.save()
         return Response({"message": "Reminder marked as done.", "status": reminder_status.status})
 
-    # PATCH /api/reminders/{id}/dismiss/
     @action(detail=True, methods=['patch'], url_path='dismiss')
     def dismiss(self, request, pk=None):
         reminder = self.get_object()
@@ -388,8 +373,7 @@ class ReminderViewSet(viewsets.ModelViewSet):
         reminder_status.status = ReminderStatus.Status.DISMISSED
         reminder_status.save()
         return Response({"message": "Reminder dismissed.", "status": reminder_status.status})
-    
-    # GET /api/reminders/family/
+
     @action(detail=False, methods=['get'], url_path='family')
     def family_reminders(self, request):
         user = request.user
@@ -400,17 +384,15 @@ class ReminderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Get all reminders assigned to family members
         reminders = Reminder.objects.filter(
             assigned_to__family=user.family
         ).exclude(
-            assigned_to=user                # exclude your own reminders
+            assigned_to=user
         ).select_related('creator').prefetch_related('assigned_to', 'statuses').distinct()
 
         serializer = ReminderSerializer(reminders, many=True, context={'request': request})
         return Response(serializer.data)
 
-    # GET /api/reminders/user/{id}/
     @action(detail=False, methods=['get'], url_path='user/(?P<user_id>[^/.]+)')
     def user_reminders(self, request, user_id=None):
         user = request.user
@@ -421,7 +403,6 @@ class ReminderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Make sure the target user exists and is in the same family
         try:
             target_user = CustomUser.objects.get(pk=user_id, family=user.family)
         except CustomUser.DoesNotExist:
@@ -437,6 +418,7 @@ class ReminderViewSet(viewsets.ModelViewSet):
         serializer = ReminderSerializer(reminders, many=True, context={'request': request})
         return Response(serializer.data)
 
+
 class MedicineViewSet(viewsets.ModelViewSet):
     serializer_class = MedicineSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -447,13 +429,13 @@ class MedicineViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    # PATCH /api/medicines/{id}/take/
     @action(detail=True, methods=['patch'], url_path='take')
     def take(self, request, pk=None):
+        from django.utils import timezone
         medicine = self.get_object()
         medicine.last_taken_at = timezone.now()
         medicine.save()
         return Response({
-            "message": f"✅ {medicine.name} marked as taken.",
+            "message": f"{medicine.name} marked as taken.",
             "last_taken_at": medicine.last_taken_at
         })
