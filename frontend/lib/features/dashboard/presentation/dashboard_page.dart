@@ -41,12 +41,10 @@ class _DashboardPageState extends State<DashboardPage> {
       if (!mounted) return;
       setState(() {
         _user = AppUser.fromJson(results[0].data);
-        _medicines = (results[1].data as List)
-            .map((m) => Medicine.fromJson(m))
-            .toList();
-        _notes = (results[2].data as List)
-            .map((n) => Note.fromJson(n))
-            .toList();
+        _medicines =
+            (results[1].data as List).map((m) => Medicine.fromJson(m)).toList();
+        _notes =
+            (results[2].data as List).map((n) => Note.fromJson(n)).toList();
       });
     } on DioException catch (_) {
       // silently fail — page shows graceful fallbacks
@@ -100,7 +98,8 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _sendMessage(String content) async {
     if (content.trim().isEmpty) return;
     try {
-      await ApiClient.instance.post('/notes/', data: {'content': content.trim()});
+      await ApiClient.instance
+          .post('/notes/', data: {'content': content.trim()});
       messageController.clear();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -196,10 +195,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 const SizedBox(height: 14),
                 MedicationReminderPanel(
-                  medicine: medicine,
-                  onMarkTaken: medicine != null
-                      ? () => _markMedicineTaken(medicine.id)
-                      : null,
+                  medicines: _medicines,
+                  onMarkTaken: _markMedicineTaken,
                 ),
                 const SizedBox(height: 14),
                 QuickMessagePanel(
@@ -251,6 +248,17 @@ class GreetingHeader extends StatelessWidget {
   final String name;
   final String? currentMood;
 
+  String _getMoodMessage(String mood) {
+    final messages = {
+      'sad': 'It might help to take things one step at a time today.',
+      'happy': 'Try to hold on to this feeling and enjoy the moment.',
+      'excited': 'Enjoy every bit of this you deserve it.',
+      'crying': 'It might be a good time to slow down and rest a bit.',
+      'angry': 'Taking a short pause might help things feel a little lighter.',
+    };
+    return messages[mood.toLowerCase()] ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -258,7 +266,8 @@ class GreetingHeader extends StatelessWidget {
       children: [
         RichText(
           text: TextSpan(
-            style: GoogleFonts.inter(color: Colors.white, fontSize: 36, height: 1),
+            style:
+                GoogleFonts.inter(color: Colors.white, fontSize: 36, height: 1),
             children: [
               const TextSpan(text: 'Hello '),
               TextSpan(
@@ -269,17 +278,18 @@ class GreetingHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        Text(
-          currentMood != null
-              ? 'You\'re feeling ${currentMood![0].toUpperCase()}${currentMood!.substring(1)} today.'
-              : 'You haven\'t checked in today. Kamusta ka?',
-          style: GoogleFonts.inter(
-            color: const Color(0xFFF9BFBF),
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
+        if (currentMood != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _getMoodMessage(currentMood!),
+            style: GoogleFonts.inter(
+              color: const Color(0xFFF9BFBF),
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              height: 1.3,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -301,7 +311,8 @@ class MoodCheckInPanel extends StatelessWidget {
       MoodData('sad', 'Sad', Icons.sentiment_dissatisfied, Color(0xFF9FA2D5)),
       MoodData('happy', 'Happy', Icons.sentiment_satisfied, Color(0xFF9AA272)),
       MoodData('excited', 'Excited', Icons.celebration, Color(0xFFE5CF7B)),
-      MoodData('crying', 'Crying', Icons.sentiment_very_dissatisfied, Color(0xFF7BA2D5)),
+      MoodData('crying', 'Crying', Icons.sentiment_very_dissatisfied,
+          Color(0xFF7BA2D5)),
       MoodData('angry', 'Angry', Icons.mood_bad, Color(0xFFE57373)),
     ];
 
@@ -370,11 +381,14 @@ class MoodItem extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: isSelected
-                  ? Border.all(color: Colors.white, width: 3)
-                  : null,
+              border:
+                  isSelected ? Border.all(color: Colors.white, width: 3) : null,
               boxShadow: isSelected
-                  ? [BoxShadow(color: data.color.withValues(alpha: 0.5), blurRadius: 8)]
+                  ? [
+                      BoxShadow(
+                          color: data.color.withValues(alpha: 0.5),
+                          blurRadius: 8)
+                    ]
                   : null,
             ),
             child: CircleAvatar(
@@ -410,15 +424,52 @@ class MoodData {
 class MedicationReminderPanel extends StatelessWidget {
   const MedicationReminderPanel({
     super.key,
-    this.medicine,
-    this.onMarkTaken,
+    required this.medicines,
+    required this.onMarkTaken,
   });
 
-  final Medicine? medicine;
-  final VoidCallback? onMarkTaken;
+  final List<Medicine> medicines;
+  final Function(int) onMarkTaken;
+
+  Medicine? _getNextReminder() {
+    if (medicines.isEmpty) return null;
+
+    final now = DateTime.now();
+    Medicine? nextReminder;
+    Duration? closestDuration;
+
+    for (final medicine in medicines) {
+      if (medicine.takenToday) continue;
+
+      // Parse the scheduled time - assuming formattedScheduledTime is in "HH:mm" format
+      try {
+        final timeParts = medicine.formattedScheduledTime.split(':');
+        final scheduledTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          int.parse(timeParts[0]),
+          int.parse(timeParts[1]),
+        );
+
+        final duration = scheduledTime.difference(now).abs();
+
+        if (closestDuration == null || duration < closestDuration) {
+          closestDuration = duration;
+          nextReminder = medicine;
+        }
+      } catch (e) {
+        // Skip if time parsing fails
+      }
+    }
+
+    return nextReminder;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final nextMedicine = _getNextReminder();
+
     return Card(
       color: const Color(0xFFFFFFFF),
       elevation: 2,
@@ -432,8 +483,8 @@ class MedicationReminderPanel extends StatelessWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(
-                medicine != null
-                    ? 'Did you take your Medicine today?'
+                medicines.isNotEmpty
+                    ? 'Next Medicine'
                     : 'No medicines scheduled.',
                 style: GoogleFonts.inter(
                   fontSize: 24,
@@ -442,10 +493,10 @@ class MedicationReminderPanel extends StatelessWidget {
                 ),
               ),
             ),
-            if (medicine != null) ...[
+            if (nextMedicine != null) ...[
               const SizedBox(height: 6),
               Text(
-                'Take at ${medicine!.formattedScheduledTime}',
+                'Take at ${nextMedicine.formattedScheduledTime}',
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   color: const Color(0xFF4A4A4A),
@@ -453,19 +504,19 @@ class MedicationReminderPanel extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '${medicine!.name}${medicine!.dosage != null ? ' — ${medicine!.dosage}' : ''}',
+                '${nextMedicine.name}${nextMedicine.dosage != null ? ' — ${nextMedicine.dosage}' : ''}',
                 style: GoogleFonts.inter(
                   fontSize: 15,
-                  color: medicine!.isOverdue
+                  color: nextMedicine.isOverdue
                       ? Colors.red
                       : const Color(0xFFE74E4E),
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              if (medicine!.skipMessage != null) ...[
+              if (nextMedicine.skipMessage != null) ...[
                 const SizedBox(height: 4),
                 Text(
-                  medicine!.skipMessage!,
+                  nextMedicine.skipMessage!,
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     color: Colors.red,
@@ -473,13 +524,13 @@ class MedicationReminderPanel extends StatelessWidget {
                   ),
                 ),
               ],
-              if (!medicine!.takenToday) ...[
+              if (!nextMedicine.takenToday) ...[
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   height: 44,
                   child: ElevatedButton(
-                    onPressed: onMarkTaken,
+                    onPressed: () => onMarkTaken(nextMedicine.id),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFE94E4D),
                       foregroundColor: Colors.white,
@@ -494,18 +545,16 @@ class MedicationReminderPanel extends StatelessWidget {
                     ),
                   ),
                 ),
-              ],
-              if (medicine!.takenToday)
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Text(
-                    'Taken today',
-                    style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: Colors.green,
-                        fontWeight: FontWeight.w600),
-                  ),
+              ] else ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Taken today',
+                  style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: Colors.green,
+                      fontWeight: FontWeight.w600),
                 ),
+              ],
             ],
           ],
         ),
@@ -540,7 +589,8 @@ class QuickMessagePanel extends StatelessWidget {
           children: [
             RichText(
               text: TextSpan(
-                style: GoogleFonts.inter(fontSize: 16, color: const Color(0xFF111111)),
+                style: GoogleFonts.inter(
+                    fontSize: 16, color: const Color(0xFF111111)),
                 children: const [
                   TextSpan(text: 'Send a quick message to '),
                   TextSpan(
@@ -600,7 +650,8 @@ class QuickMessagePanel extends StatelessWidget {
                     ),
                     child: Transform.rotate(
                       angle: -0.7854,
-                      child: const Icon(Icons.send_rounded, size: 26, color: Colors.white),
+                      child: const Icon(Icons.send_rounded,
+                          size: 26, color: Colors.white),
                     ),
                   ),
                 ),
@@ -629,7 +680,8 @@ class _QuickPresetButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFE94E4D),
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           elevation: 0,
         ),
         child: Text(
@@ -670,7 +722,8 @@ class FamilyNotesFeedPanel extends StatelessWidget {
             if (notes.isEmpty)
               Text(
                 'No messages yet.',
-                style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF9F9F9F)),
+                style: GoogleFonts.inter(
+                    fontSize: 13, color: const Color(0xFF9F9F9F)),
               )
             else
               ...notes.take(5).map(
@@ -682,7 +735,8 @@ class FamilyNotesFeedPanel extends StatelessWidget {
                           const CircleAvatar(
                             radius: 16,
                             backgroundColor: Color(0xFFE94E4D),
-                            child: Icon(Icons.person, color: Colors.white, size: 16),
+                            child: Icon(Icons.person,
+                                color: Colors.white, size: 16),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -700,12 +754,14 @@ class FamilyNotesFeedPanel extends StatelessWidget {
                                 Text(
                                   note.content,
                                   style: GoogleFonts.inter(
-                                      fontSize: 13, color: const Color(0xFF222222)),
+                                      fontSize: 13,
+                                      color: const Color(0xFF222222)),
                                 ),
                                 Text(
                                   note.formattedTime,
                                   style: GoogleFonts.inter(
-                                      fontSize: 11, color: const Color(0xFF9F9F9F)),
+                                      fontSize: 11,
+                                      color: const Color(0xFF9F9F9F)),
                                 ),
                               ],
                             ),
@@ -740,7 +796,8 @@ class AppBottomNavBar extends StatelessWidget {
           color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(26),
           boxShadow: const [
-            BoxShadow(color: Color(0x22000000), blurRadius: 20, offset: Offset(0, 8)),
+            BoxShadow(
+                color: Color(0x22000000), blurRadius: 20, offset: Offset(0, 8)),
           ],
         ),
         child: ClipRRect(
@@ -754,7 +811,8 @@ class AppBottomNavBar extends StatelessWidget {
             selectedItemColor: const Color(0xFFE94E4D),
             unselectedItemColor: const Color(0xFF9F9F9F),
             selectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w700),
-            unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            unselectedLabelStyle:
+                GoogleFonts.inter(fontWeight: FontWeight.w600),
             items: const [
               BottomNavigationBarItem(
                 icon: Icon(Icons.home_outlined),

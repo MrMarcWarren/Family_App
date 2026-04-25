@@ -47,6 +47,7 @@ class FamilyMember {
   final bool inEmergency;
   final double? latitude;
   final double? longitude;
+  final String? phone;
 
   FamilyMember({
     required this.id,
@@ -56,6 +57,7 @@ class FamilyMember {
     required this.inEmergency,
     this.latitude,
     this.longitude,
+    this.phone,
   });
 
   factory FamilyMember.fromJson(Map<String, dynamic> json) {
@@ -66,8 +68,13 @@ class FamilyMember {
       firstName: json['first_name'],
       mood: json['mood'] ?? 'happy',
       inEmergency: json['in_emergency'] ?? false,
-      latitude: geotag != null ? double.tryParse(geotag['latitude'].toString()) : null,
-      longitude: geotag != null ? double.tryParse(geotag['longitude'].toString()) : null,
+      latitude: geotag != null
+          ? double.tryParse(geotag['latitude'].toString())
+          : null,
+      longitude: geotag != null
+          ? double.tryParse(geotag['longitude'].toString())
+          : null,
+      phone: json['phone'],
     );
   }
 

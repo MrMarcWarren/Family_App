@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/models.dart';
@@ -71,8 +72,9 @@ class _FamilyPageState extends State<FamilyPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-              isOn ? 'Emergency alert activated!' : 'Emergency alert deactivated.'),
+          content: Text(isOn
+              ? 'Emergency alert activated!'
+              : 'Emergency alert deactivated.'),
           backgroundColor: isOn ? Colors.red : const Color(0xFFE94E4D),
         ),
       );
@@ -134,35 +136,54 @@ class _FamilyPageState extends State<FamilyPage> {
   }
 }
 
-void _showFamilyCheckInModal(BuildContext context, FamilyMember member,
-    VoidCallback onCheckOn) {
+void _showFamilyCheckInModal(
+    BuildContext context, FamilyMember member, VoidCallback onCheckOn) {
   showDialog<void>(
     context: context,
     barrierDismissible: true,
     builder: (dialogContext) {
       return FamilyCheckInModal(
         name: member.displayName,
-        statusText: 'Status: Feeling ${member.mood[0].toUpperCase()}${member.mood.substring(1)}',
+        statusText:
+            'Status: Feeling ${member.mood[0].toUpperCase()}${member.mood.substring(1)}',
+        phone: member.phone,
         onCheckOnThem: () {
           Navigator.of(dialogContext).pop();
           onCheckOn();
         },
-        onMessage: () => Navigator.of(dialogContext).pop(),
-        onCall: () => Navigator.of(dialogContext).pop(),
+        onMessage: member.phone != null
+            ? () async {
+                Navigator.of(dialogContext).pop();
+                await launchUrl(Uri(
+                  scheme: 'sms',
+                  path: member.phone,
+                ));
+              }
+            : null,
+        onCall: member.phone != null
+            ? () async {
+                Navigator.of(dialogContext).pop();
+                await launchUrl(Uri(
+                  scheme: 'tel',
+                  path: member.phone,
+                ));
+              }
+            : null,
       );
     },
   );
 }
 
-void _showFamilyProfileModal(BuildContext context, FamilyMember member,
-    VoidCallback onCheckOn) {
+void _showFamilyProfileModal(
+    BuildContext context, FamilyMember member, VoidCallback onCheckOn) {
   showDialog<void>(
     context: context,
     barrierDismissible: true,
     builder: (dialogContext) {
       return FamilyProfileModal(
         name: member.displayName,
-        statusText: 'Status: Feeling ${member.mood[0].toUpperCase()}${member.mood.substring(1)}',
+        statusText:
+            'Status: Feeling ${member.mood[0].toUpperCase()}${member.mood.substring(1)}',
         onCheckOnThem: () {
           Navigator.of(dialogContext).pop();
           onCheckOn();
@@ -188,14 +209,17 @@ class FamilyHeader extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: 16,
       title: Row(
         children: [
-          Image.asset('assets/images/logos/tahanan_logo.png', width: 32, height: 32),
+          Image.asset('assets/images/logos/tahanan_logo.png',
+              width: 32, height: 32),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
               'TAHANAN',
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w800, letterSpacing: 1.1, fontSize: 18),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                  fontSize: 18),
             ),
           ),
         ],
@@ -224,7 +248,7 @@ class FamilyMembersPanel extends StatelessWidget {
     'happy': Color(0xFF9AA272),
     'sad': Color(0xFF9FA2D5),
     'excited': Color(0xFFE5CF7B),
-    'crying': Color(0xFF7BA2D5),
+    'tired': Color(0xFF7BA2D5),
     'angry': Color(0xFFE57373),
   };
 
@@ -243,14 +267,16 @@ class FamilyMembersPanel extends StatelessWidget {
             Text(
               'My Family',
               style: GoogleFonts.inter(
-                  fontSize: 17, fontWeight: FontWeight.w800, color: const Color(0xFF4A4A4A)),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF4A4A4A)),
             ),
             const SizedBox(height: 12),
             members.isEmpty
                 ? Text(
                     'No family members yet.',
-                    style:
-                        GoogleFonts.inter(fontSize: 13, color: const Color(0xFF9F9F9F)),
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: const Color(0xFF9F9F9F)),
                   )
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -261,8 +287,8 @@ class FamilyMembersPanel extends StatelessWidget {
                         child: Column(
                           children: [
                             GestureDetector(
-                              onTap: () =>
-                                  _showFamilyProfileModal(context, member, () {}),
+                              onTap: () => _showFamilyProfileModal(
+                                  context, member, () {}),
                               child: Stack(
                                 alignment: Alignment.bottomLeft,
                                 children: [
@@ -270,7 +296,8 @@ class FamilyMembersPanel extends StatelessWidget {
                                     radius: 22,
                                     backgroundColor: Color(0xFFD5D5D5),
                                   ),
-                                  CircleAvatar(radius: 9, backgroundColor: color),
+                                  CircleAvatar(
+                                      radius: 9, backgroundColor: color),
                                 ],
                               ),
                             ),
@@ -304,8 +331,9 @@ class FamilyMapPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final membersWithLocation =
-        members.where((m) => m.latitude != null && m.longitude != null).toList();
+    final membersWithLocation = members
+        .where((m) => m.latitude != null && m.longitude != null)
+        .toList();
 
     final LatLng center = membersWithLocation.isNotEmpty
         ? LatLng(membersWithLocation.first.latitude!,
@@ -382,13 +410,16 @@ class FamilyCheckInPanel extends StatelessWidget {
             Text(
               'Check up on your Family',
               style: GoogleFonts.inter(
-                  fontSize: 17, fontWeight: FontWeight.w800, color: const Color(0xFF4A4A4A)),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF4A4A4A)),
             ),
             const SizedBox(height: 10),
             if (members.isEmpty)
               Text(
                 'No family members to check on.',
-                style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF9F9F9F)),
+                style: GoogleFonts.inter(
+                    fontSize: 13, color: const Color(0xFF9F9F9F)),
               )
             else
               ...members.map(
@@ -522,7 +553,8 @@ class FamilyProfileModal extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                     color: const Color(0xFF9B9B9B))),
             const SizedBox(height: 12),
-            _ModalActionButton(label: 'Check on them', onPressed: onCheckOnThem),
+            _ModalActionButton(
+                label: 'Check on them', onPressed: onCheckOnThem),
             const SizedBox(height: 8),
             _ModalActionButton(label: 'Add Reminder', onPressed: onAddReminder),
           ],
@@ -538,15 +570,17 @@ class FamilyCheckInModal extends StatelessWidget {
     required this.name,
     required this.statusText,
     required this.onCheckOnThem,
-    required this.onMessage,
-    required this.onCall,
+    this.onMessage,
+    this.onCall,
+    this.phone,
   });
 
   final String name;
   final String statusText;
   final VoidCallback onCheckOnThem;
-  final VoidCallback onMessage;
-  final VoidCallback onCall;
+  final VoidCallback? onMessage;
+  final VoidCallback? onCall;
+  final String? phone;
 
   @override
   Widget build(BuildContext context) {
@@ -575,11 +609,20 @@ class FamilyCheckInModal extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                     color: const Color(0xFF9B9B9B))),
             const SizedBox(height: 12),
-            _ModalActionButton(label: 'Check on them', onPressed: onCheckOnThem),
+            _ModalActionButton(
+                label: 'Check on them', onPressed: onCheckOnThem),
             const SizedBox(height: 8),
-            _ModalActionButton(label: 'Message', onPressed: onMessage),
+            _ModalActionButton(
+              label: 'Message',
+              onPressed: onMessage,
+              enabled: phone != null && phone!.isNotEmpty,
+            ),
             const SizedBox(height: 8),
-            _ModalActionButton(label: 'Call', onPressed: onCall),
+            _ModalActionButton(
+              label: 'Call',
+              onPressed: onCall,
+              enabled: phone != null && phone!.isNotEmpty,
+            ),
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
@@ -615,10 +658,15 @@ class FamilyCheckInModal extends StatelessWidget {
 }
 
 class _ModalActionButton extends StatelessWidget {
-  const _ModalActionButton({required this.label, required this.onPressed});
+  const _ModalActionButton({
+    required this.label,
+    this.onPressed,
+    this.enabled = true,
+  });
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -626,15 +674,17 @@ class _ModalActionButton extends StatelessWidget {
       width: double.infinity,
       height: 42,
       child: ElevatedButton(
-        onPressed: onPressed,
+        onPressed: enabled ? onPressed : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFE94E4D),
+          backgroundColor:
+              enabled ? const Color(0xFFE94E4D) : const Color(0xFFCCCCCC),
           foregroundColor: Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           elevation: 0,
           textStyle:
               GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
+          disabledBackgroundColor: const Color(0xFFCCCCCC),
         ),
         child: Text(label),
       ),
@@ -669,7 +719,8 @@ class _EmergencyAlertPanel extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Press to alert your family that you need help.',
-              style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF7B7B7B)),
+              style: GoogleFonts.inter(
+                  fontSize: 13, color: const Color(0xFF7B7B7B)),
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -716,7 +767,8 @@ class AppBottomNavBar extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(26),
           boxShadow: const [
-            BoxShadow(color: Color(0x22000000), blurRadius: 20, offset: Offset(0, 8)),
+            BoxShadow(
+                color: Color(0x22000000), blurRadius: 20, offset: Offset(0, 8)),
           ],
         ),
         child: ClipRRect(
@@ -730,7 +782,8 @@ class AppBottomNavBar extends StatelessWidget {
             selectedItemColor: const Color(0xFFE94E4D),
             unselectedItemColor: const Color(0xFF9F9F9F),
             selectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w700),
-            unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            unselectedLabelStyle:
+                GoogleFonts.inter(fontWeight: FontWeight.w600),
             items: const [
               BottomNavigationBarItem(
                   icon: Icon(Icons.home_outlined),

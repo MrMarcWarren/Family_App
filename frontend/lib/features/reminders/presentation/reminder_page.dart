@@ -35,16 +35,15 @@ class _ReminderPageState extends State<ReminderPage> {
 
       final futures = [ApiClient.instance.get('/reminders/mine/')];
       if (user.familyId != null) {
-        futures.add(
-            ApiClient.instance.get('/families/${user.familyId}/members/'));
+        futures
+            .add(ApiClient.instance.get('/families/${user.familyId}/members/'));
       }
 
       final results = await Future.wait(futures);
       if (!mounted) return;
       setState(() {
-        _reminders = (results[0].data as List)
-            .map((r) => Reminder.fromJson(r))
-            .toList();
+        _reminders =
+            (results[0].data as List).map((r) => Reminder.fromJson(r)).toList();
         if (results.length > 1) {
           _familyMembers = (results[1].data as List)
               .map((m) => FamilyMember.fromJson(m))
@@ -59,26 +58,38 @@ class _ReminderPageState extends State<ReminderPage> {
   }
 
   Future<void> _markDone(int id) async {
+    // Immediately remove from UI
+    setState(() {
+      _reminders.removeWhere((r) => r.id == id);
+    });
+
     try {
       await ApiClient.instance.patch('/reminders/$id/done/');
-      await _loadData();
     } on DioException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(ApiClient.extractError(e))),
       );
+      // Reload to restore state if API call fails
+      await _loadData();
     }
   }
 
   Future<void> _dismiss(int id) async {
+    // Immediately remove from UI
+    setState(() {
+      _reminders.removeWhere((r) => r.id == id);
+    });
+
     try {
       await ApiClient.instance.patch('/reminders/$id/dismiss/');
-      await _loadData();
     } on DioException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(ApiClient.extractError(e))),
       );
+      // Reload to restore state if API call fails
+      await _loadData();
     }
   }
 
@@ -102,8 +113,7 @@ class _ReminderPageState extends State<ReminderPage> {
 
   @override
   Widget build(BuildContext context) {
-    final memberNames =
-        _familyMembers.map((m) => m.displayName).toList();
+    final memberNames = _familyMembers.map((m) => m.displayName).toList();
     final memberIds = _familyMembers.map((m) => m.id).toList();
 
     return Scaffold(
@@ -111,7 +121,8 @@ class _ReminderPageState extends State<ReminderPage> {
       extendBody: true,
       appBar: const ReminderHeader(),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFE94E4D)))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFE94E4D)))
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 138),
               children: [
@@ -187,13 +198,16 @@ class ReminderHeader extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: 16,
       title: Row(
         children: [
-          Image.asset('assets/images/logos/tahanan_logo.png', width: 32, height: 32),
+          Image.asset('assets/images/logos/tahanan_logo.png',
+              width: 32, height: 32),
           const SizedBox(width: 8),
           Flexible(
             child: Text('TAHANAN',
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w800, letterSpacing: 1.1, fontSize: 18)),
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                    fontSize: 18)),
           ),
         ],
       ),
@@ -260,7 +274,9 @@ class ReminderPanel extends StatelessWidget {
                     contentHint: reminder.description ?? '',
                     timeText: 'Time: ${reminder.formattedTime}',
                     onDone: onDone != null ? () => onDone!(reminder.id) : null,
-                    onDismiss: onDismiss != null ? () => onDismiss!(reminder.id) : null,
+                    onDismiss: onDismiss != null
+                        ? () => onDismiss!(reminder.id)
+                        : null,
                   ),
                 );
               }),
@@ -276,8 +292,8 @@ class ReminderPanel extends StatelessWidget {
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
-                  textStyle:
-                      GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+                  textStyle: GoogleFonts.inter(
+                      fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 child: const Text('Add Reminder'),
               ),
@@ -361,8 +377,7 @@ class ReminderCardSection extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (onDone != null && onDismiss != null)
-                const SizedBox(width: 8),
+              if (onDone != null && onDismiss != null) const SizedBox(width: 8),
               if (onDismiss != null)
                 Expanded(
                   child: SizedBox(
@@ -397,8 +412,8 @@ class AddReminderModal extends StatefulWidget {
     this.initiallySelectedIndex = 0,
   });
 
-  final void Function(String title, String notes, DateTime dateTime,
-      int memberIndex) onConfirm;
+  final void Function(
+      String title, String notes, DateTime dateTime, int memberIndex) onConfirm;
   final List<String> memberNames;
   final int initiallySelectedIndex;
 
@@ -432,8 +447,12 @@ class _AddReminderModalState extends State<AddReminderModal> {
         initialTime: TimeOfDay.fromDateTime(_selectedDateTime));
     if (picked != null && mounted) {
       setState(() {
-        _selectedDateTime = DateTime(_selectedDateTime.year,
-            _selectedDateTime.month, _selectedDateTime.day, picked.hour, picked.minute);
+        _selectedDateTime = DateTime(
+            _selectedDateTime.year,
+            _selectedDateTime.month,
+            _selectedDateTime.day,
+            picked.hour,
+            picked.minute);
       });
     }
   }
@@ -454,8 +473,18 @@ class _AddReminderModalState extends State<AddReminderModal> {
 
   String _monthShort(int month) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return months[month - 1];
   }
@@ -543,21 +572,28 @@ class _AddReminderModalState extends State<AddReminderModal> {
                 children: [
                   Expanded(
                     child: _SelectorPill(
-                      text: '${TimeOfDay.fromDateTime(_selectedDateTime).hourOfPeriod == 0 ? 12 : TimeOfDay.fromDateTime(_selectedDateTime).hourOfPeriod}',
+                      text:
+                          '${TimeOfDay.fromDateTime(_selectedDateTime).hourOfPeriod == 0 ? 12 : TimeOfDay.fromDateTime(_selectedDateTime).hourOfPeriod}',
                       onTap: () => _pickTime(context),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _SelectorPill(
-                      text: TimeOfDay.fromDateTime(_selectedDateTime).minute.toString().padLeft(2, '0'),
+                      text: TimeOfDay.fromDateTime(_selectedDateTime)
+                          .minute
+                          .toString()
+                          .padLeft(2, '0'),
                       onTap: () => _pickTime(context),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _SelectorPill(
-                      text: TimeOfDay.fromDateTime(_selectedDateTime).period == DayPeriod.am ? 'AM' : 'PM',
+                      text: TimeOfDay.fromDateTime(_selectedDateTime).period ==
+                              DayPeriod.am
+                          ? 'AM'
+                          : 'PM',
                       onTap: () => _pickTime(context),
                     ),
                   ),
@@ -614,8 +650,8 @@ class _AddReminderModalState extends State<AddReminderModal> {
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
-                    textStyle:
-                        GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+                    textStyle: GoogleFonts.inter(
+                        fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                   child: const Text('Confirm Reminder'),
                 ),
@@ -738,7 +774,8 @@ class ReminderBottomNavBar extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(26),
           boxShadow: const [
-            BoxShadow(color: Color(0x22000000), blurRadius: 20, offset: Offset(0, 8)),
+            BoxShadow(
+                color: Color(0x22000000), blurRadius: 20, offset: Offset(0, 8)),
           ],
         ),
         child: ClipRRect(
@@ -752,7 +789,8 @@ class ReminderBottomNavBar extends StatelessWidget {
             selectedItemColor: const Color(0xFFE94E4D),
             unselectedItemColor: const Color(0xFF9F9F9F),
             selectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w700),
-            unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            unselectedLabelStyle:
+                GoogleFonts.inter(fontWeight: FontWeight.w600),
             items: const [
               BottomNavigationBarItem(
                   icon: Icon(Icons.home_outlined),

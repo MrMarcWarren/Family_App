@@ -3,7 +3,7 @@ import 'token_store.dart';
 
 // Android emulator → 10.0.2.2, iOS simulator / web → 127.0.0.1
 // Change to your machine's LAN IP when testing on a real device.
-const String kBaseUrl = 'http://10.0.2.2:8000/api';
+const String kBaseUrl = 'http://127.0.0.1:8000/api';
 
 class ApiClient {
   static final Dio _dio = Dio(
