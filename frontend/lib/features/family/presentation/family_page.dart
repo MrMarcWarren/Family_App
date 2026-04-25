@@ -3,6 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../reminders/presentation/reminder_page.dart';
+
 class FamilyPage extends StatefulWidget {
   const FamilyPage({super.key});
 
@@ -32,6 +34,12 @@ class _FamilyPageState extends State<FamilyPage> {
       bottomNavigationBar: AppBottomNavBar(
         currentIndex: selectedTabIndex,
         onTap: (index) {
+          if (index == 2) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const ReminderPage()),
+            );
+            return;
+          }
           setState(() {
             selectedTabIndex = index;
           });
