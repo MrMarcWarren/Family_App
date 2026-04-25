@@ -1,5 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/api_client.dart';
+import '../../../core/token_store.dart';
 import 'family_registration_pages.dart';
 import '../../dashboard/presentation/dashboard_page.dart';
 import 'widgets/tahanan_logo.dart';
@@ -12,14 +15,52 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final TextEditingController emailController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    emailController.dispose();
+    usernameController.dispose();
     passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    final username = usernameController.text.trim();
+    final password = passwordController.text;
+
+    if (username.isEmpty || password.isEmpty) {
+      _showError('Please enter your username and password.');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await ApiClient.instance.post(
+        '/auth/login/',
+        data: {'username': username, 'password': password},
+      );
+      await TokenStore.saveTokens(
+        response.data['access'],
+        response.data['refresh'],
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const DashboardPage()),
+      );
+    } on DioException catch (e) {
+      _showError(ApiClient.extractError(e));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.black87),
+    );
   }
 
   @override
@@ -55,32 +96,26 @@ class _LoginPageState extends State<LoginPage> {
                       const Spacer(flex: 2),
                       const TahananLogo(),
                       const SizedBox(height: 56),
-                      const _FormFieldLabel(label: 'Email Address'),
+                      const _FormFieldLabel(label: 'Username'),
                       const SizedBox(height: 8),
                       _RoundedInput(
-                        controller: emailController,
-                        hintText: 'Enter Email Address',
-                        keyboardType: TextInputType.emailAddress,
+                        controller: usernameController,
+                        hintText: 'Enter Username',
+                        keyboardType: TextInputType.text,
                       ),
                       const SizedBox(height: 10),
                       const _FormFieldLabel(label: 'Password'),
                       const SizedBox(height: 8),
                       _RoundedInput(
                         controller: passwordController,
-                        hintText: 'Enter Desired Password',
+                        hintText: 'Enter Password',
                         obscureText: true,
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
                         height: 42,
                         child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (context) => const DashboardPage(),
-                              ),
-                            );
-                          },
+                          onPressed: _isLoading ? null : _login,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: const Color(0xFFF63C3C),
@@ -93,13 +128,22 @@ class _LoginPageState extends State<LoginPage> {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          child: const Text('Login'),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFFF63C3C),
+                                  ),
+                                )
+                              : const Text('Login'),
                         ),
                       ),
                       const Spacer(flex: 2),
                       const Center(
                         child: Text(
-                          "Don’t Have an account yet?",
+                          "Don't Have an account yet?",
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 13,

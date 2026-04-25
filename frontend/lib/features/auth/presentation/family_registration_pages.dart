@@ -1,6 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/api_client.dart';
+import '../../../core/token_store.dart';
 import '../../dashboard/presentation/dashboard_page.dart';
 import 'widgets/tahanan_logo.dart';
 
@@ -12,11 +15,10 @@ class JoinFamilyPage extends StatelessWidget {
     return const _FamilyRegistrationPage(
       title: 'Join a Family',
       description:
-          'Enter your family code and personal details to join the household.',
-      includeFamilyCode: true,
+          'Enter the Family ID and your personal details to join the household.',
+      includeFamilyId: true,
       actionLabel: 'Join Family',
-      familyCodeLabel: 'Family Code',
-      navigateToDashboardOnSubmit: false,
+      familyIdLabel: 'Family ID',
     );
   }
 }
@@ -28,10 +30,9 @@ class CreateFamilyPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const _FamilyRegistrationPage(
       title: 'Create a Family',
-      description: 'Set up a new family space and invite others to join later.',
-      includeFamilyCode: false,
+      description: 'Register your account. An admin will set up the family space.',
+      includeFamilyId: false,
       actionLabel: 'Register Account',
-      navigateToDashboardOnSubmit: true,
     );
   }
 }
@@ -40,18 +41,16 @@ class _FamilyRegistrationPage extends StatefulWidget {
   const _FamilyRegistrationPage({
     required this.title,
     required this.description,
-    required this.includeFamilyCode,
+    required this.includeFamilyId,
     required this.actionLabel,
-    required this.navigateToDashboardOnSubmit,
-    this.familyCodeLabel,
+    this.familyIdLabel,
   });
 
   final String title;
   final String description;
-  final bool includeFamilyCode;
+  final bool includeFamilyId;
   final String actionLabel;
-  final bool navigateToDashboardOnSubmit;
-  final String? familyCodeLabel;
+  final String? familyIdLabel;
 
   @override
   State<_FamilyRegistrationPage> createState() =>
@@ -59,7 +58,7 @@ class _FamilyRegistrationPage extends StatefulWidget {
 }
 
 class _FamilyRegistrationPageState extends State<_FamilyRegistrationPage> {
-  final TextEditingController familyCodeController = TextEditingController();
+  final TextEditingController familyIdController = TextEditingController();
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -67,10 +66,11 @@ class _FamilyRegistrationPageState extends State<_FamilyRegistrationPage> {
   final TextEditingController dayController = TextEditingController();
   final TextEditingController monthController = TextEditingController();
   final TextEditingController yearController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    familyCodeController.dispose();
+    familyIdController.dispose();
     nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
@@ -79,6 +79,75 @@ class _FamilyRegistrationPageState extends State<_FamilyRegistrationPage> {
     monthController.dispose();
     yearController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final username = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+    final phone = contactController.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      _showError('Name and password are required.');
+      return;
+    }
+
+    String? birthday;
+    final day = dayController.text.trim();
+    final month = monthController.text.trim();
+    final year = yearController.text.trim();
+    if (day.isNotEmpty && month.isNotEmpty && year.isNotEmpty) {
+      birthday =
+          '${year.padLeft(4, '0')}-${month.padLeft(2, '0')}-${day.padLeft(2, '0')}';
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // 1. Register
+      await ApiClient.instance.post('/auth/register/', data: {
+        'username': username,
+        'email': email,
+        'password': password,
+        'password2': password,
+        if (phone.isNotEmpty) 'phone': phone,
+        if (birthday != null) 'birthday': birthday,
+      });
+
+      // 2. Login to get tokens
+      final loginRes = await ApiClient.instance.post('/auth/login/', data: {
+        'username': username,
+        'password': password,
+      });
+      await TokenStore.saveTokens(
+        loginRes.data['access'],
+        loginRes.data['refresh'],
+      );
+
+      // 3. Join family if family ID was provided
+      if (widget.includeFamilyId) {
+        final familyId = int.tryParse(familyIdController.text.trim());
+        if (familyId != null) {
+          await ApiClient.instance.post('/families/$familyId/join/');
+        }
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const DashboardPage()),
+        (route) => false,
+      );
+    } on DioException catch (e) {
+      _showError(ApiClient.extractError(e));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.black87),
+    );
   }
 
   @override
@@ -137,25 +206,25 @@ class _FamilyRegistrationPageState extends State<_FamilyRegistrationPage> {
                         ),
                       ),
                       const SizedBox(height: 22),
-                      if (widget.includeFamilyCode) ...[
+                      if (widget.includeFamilyId) ...[
                         _SectionLabel(
-                            label: widget.familyCodeLabel ?? 'Family Code'),
+                            label: widget.familyIdLabel ?? 'Family ID'),
                         const SizedBox(height: 8),
                         _RoundedInput(
-                          controller: familyCodeController,
-                          hintText: 'Enter Family Code',
-                          keyboardType: TextInputType.text,
+                          controller: familyIdController,
+                          hintText: 'Enter Family ID (number)',
+                          keyboardType: TextInputType.number,
                         ),
                         const SizedBox(height: 18),
                       ],
                       const _SectionLabel(label: 'Personal Details'),
                       const SizedBox(height: 10),
-                      const _SectionLabel(label: 'Name'),
+                      const _SectionLabel(label: 'Username'),
                       const SizedBox(height: 8),
                       _RoundedInput(
                         controller: nameController,
-                        hintText: 'Enter Full Name',
-                        keyboardType: TextInputType.name,
+                        hintText: 'Enter Username',
+                        keyboardType: TextInputType.text,
                       ),
                       const SizedBox(height: 10),
                       const _SectionLabel(label: 'Email Address'),
@@ -170,7 +239,7 @@ class _FamilyRegistrationPageState extends State<_FamilyRegistrationPage> {
                       const SizedBox(height: 8),
                       _RoundedInput(
                         controller: passwordController,
-                        hintText: 'Enter Desired Password',
+                        hintText: 'Enter Password',
                         obscureText: true,
                       ),
                       const SizedBox(height: 10),
@@ -215,16 +284,7 @@ class _FamilyRegistrationPageState extends State<_FamilyRegistrationPage> {
                       SizedBox(
                         height: 46,
                         child: ElevatedButton(
-                          onPressed: () {
-                            if (widget.navigateToDashboardOnSubmit) {
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(
-                                  builder: (context) => const DashboardPage(),
-                                ),
-                                (route) => false,
-                              );
-                            }
-                          },
+                          onPressed: _isLoading ? null : _submit,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: const Color(0xFFF63C3C),
@@ -237,7 +297,16 @@ class _FamilyRegistrationPageState extends State<_FamilyRegistrationPage> {
                               fontWeight: FontWeight.w800,
                             ).copyWith(color: const Color(0xFFF63C3C)),
                           ),
-                          child: Text(widget.actionLabel),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFFF63C3C),
+                                  ),
+                                )
+                              : Text(widget.actionLabel),
                         ),
                       ),
                       const SizedBox(height: 10),

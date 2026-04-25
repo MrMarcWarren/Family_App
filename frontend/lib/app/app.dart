@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../core/token_store.dart';
 import '../features/auth/presentation/login_page.dart';
+import '../features/dashboard/presentation/dashboard_page.dart';
 
 class FamilyApp extends StatelessWidget {
   const FamilyApp({super.key});
@@ -29,7 +31,21 @@ class FamilyApp extends StatelessWidget {
         ),
         fontFamily: GoogleFonts.inter().fontFamily,
       ),
-      home: const LoginPage(),
+      home: FutureBuilder<bool>(
+        future: TokenStore.hasToken(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              backgroundColor: Color(0xFFE94E4D),
+              body: Center(child: CircularProgressIndicator(color: Colors.white)),
+            );
+          }
+          if (snapshot.data == true) {
+            return const DashboardPage();
+          }
+          return const LoginPage();
+        },
+      ),
     );
   }
 }

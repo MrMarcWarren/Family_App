@@ -1,6 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/api_client.dart';
+import '../../../core/models.dart';
+import '../../../core/token_store.dart';
+import '../../auth/presentation/login_page.dart';
 import '../../family/presentation/family_page.dart';
 import '../../reminders/presentation/reminder_page.dart';
 
@@ -13,8 +18,95 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int selectedTabIndex = 0;
-  bool medicationTaken = false;
   final TextEditingController messageController = TextEditingController();
+
+  AppUser? _user;
+  List<Medicine> _medicines = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final results = await Future.wait([
+        ApiClient.instance.get('/users/me/'),
+        ApiClient.instance.get('/medicines/'),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _user = AppUser.fromJson(results[0].data);
+        _medicines = (results[1].data as List)
+            .map((m) => Medicine.fromJson(m))
+            .toList();
+      });
+    } on DioException catch (_) {
+      // silently fail — page shows graceful fallbacks
+    }
+  }
+
+  Future<void> _updateMood(String moodValue) async {
+    try {
+      await ApiClient.instance.patch('/users/me/', data: {'mood': moodValue});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Mood updated to $moodValue'),
+          backgroundColor: const Color(0xFFE94E4D),
+        ),
+      );
+      setState(() {
+        if (_user != null) {
+          _user = AppUser(
+            id: _user!.id,
+            username: _user!.username,
+            firstName: _user!.firstName,
+            lastName: _user!.lastName,
+            familyId: _user!.familyId,
+            mood: moodValue,
+            checkedOn: _user!.checkedOn,
+            inEmergency: _user!.inEmergency,
+          );
+        }
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ApiClient.extractError(e))),
+      );
+    }
+  }
+
+  Future<void> _sendMessage(String content) async {
+    if (content.trim().isEmpty) return;
+    try {
+      await ApiClient.instance.post('/notes/', data: {'content': content.trim()});
+      messageController.clear();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Message sent to family!'),
+          backgroundColor: Color(0xFFE94E4D),
+        ),
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ApiClient.extractError(e))),
+      );
+    }
+  }
+
+  Future<void> _logout() async {
+    await TokenStore.clearTokens();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
+  }
 
   @override
   void dispose() {
@@ -24,6 +116,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final medicine = _medicines.isNotEmpty ? _medicines.first : null;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
       extendBody: true,
@@ -52,7 +146,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: _logout,
             icon: const CircleAvatar(
               radius: 14,
               backgroundColor: Colors.white,
@@ -68,29 +162,28 @@ class _DashboardPageState extends State<DashboardPage> {
             width: double.infinity,
             color: const Color(0xFFE74E4E),
             padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
-            child: const GreetingHeader(name: 'Warren'),
+            child: GreetingHeader(
+              name: _user?.displayName ?? '...',
+              currentMood: _user?.mood,
+            ),
           ),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 140),
               children: [
                 MoodCheckInPanel(
-                  onMoodPressed: (mood) {},
+                  currentMood: _user?.mood,
+                  onMoodPressed: _updateMood,
                 ),
                 const SizedBox(height: 14),
-                MedicationReminderPanel(
-                  isChecked: medicationTaken,
-                  onChanged: (value) {
-                    setState(() {
-                      medicationTaken = value ?? false;
-                    });
-                  },
-                ),
+                MedicationReminderPanel(medicine: medicine),
                 const SizedBox(height: 14),
                 QuickMessagePanel(
                   controller: messageController,
-                  onPresetPressed: (message) {},
-                  onSendPressed: () {},
+                  onPresetPressed: (message) {
+                    messageController.text = message;
+                  },
+                  onSendPressed: () => _sendMessage(messageController.text),
                 ),
               ],
             ),
@@ -100,9 +193,7 @@ class _DashboardPageState extends State<DashboardPage> {
       bottomNavigationBar: AppBottomNavBar(
         currentIndex: selectedTabIndex,
         onTap: (index) {
-          if (index == selectedTabIndex) {
-            return;
-          }
+          if (index == selectedTabIndex) return;
           if (index == 1) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (context) => const FamilyPage()),
@@ -115,9 +206,7 @@ class _DashboardPageState extends State<DashboardPage> {
             );
             return;
           }
-          setState(() {
-            selectedTabIndex = index;
-          });
+          setState(() => selectedTabIndex = index);
         },
       ),
     );
@@ -125,12 +214,10 @@ class _DashboardPageState extends State<DashboardPage> {
 }
 
 class GreetingHeader extends StatelessWidget {
-  const GreetingHeader({
-    super.key,
-    required this.name,
-  });
+  const GreetingHeader({super.key, required this.name, this.currentMood});
 
   final String name;
+  final String? currentMood;
 
   @override
   Widget build(BuildContext context) {
@@ -139,11 +226,7 @@ class GreetingHeader extends StatelessWidget {
       children: [
         RichText(
           text: TextSpan(
-            style: GoogleFonts.inter(
-              color: Colors.white,
-              fontSize: 36,
-              height: 1,
-            ),
+            style: GoogleFonts.inter(color: Colors.white, fontSize: 36, height: 1),
             children: [
               const TextSpan(text: 'Hello '),
               TextSpan(
@@ -155,7 +238,9 @@ class GreetingHeader extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          'You haven’t checked in today. Kamusta ka?',
+          currentMood != null
+              ? 'You\'re feeling ${currentMood![0].toUpperCase()}${currentMood!.substring(1)} today.'
+              : 'You haven\'t checked in today. Kamusta ka?',
           style: GoogleFonts.inter(
             color: const Color(0xFFF9BFBF),
             fontSize: 16,
@@ -172,18 +257,20 @@ class MoodCheckInPanel extends StatelessWidget {
   const MoodCheckInPanel({
     super.key,
     required this.onMoodPressed,
+    this.currentMood,
   });
 
   final ValueChanged<String> onMoodPressed;
+  final String? currentMood;
 
   @override
   Widget build(BuildContext context) {
     const moods = [
-      _MoodData('Sad', Icons.sentiment_dissatisfied, Color(0xFF9FA2D5)),
-      _MoodData('Happy', Icons.sentiment_satisfied, Color(0xFF9AA272)),
-      _MoodData('Excited', Icons.celebration, Color(0xFFE5CF7B)),
-      _MoodData('Crying', Icons.sentiment_very_dissatisfied, Color(0xFF7BA2D5)),
-      _MoodData('Very Happy', Icons.mood, Color(0xFFCBCBCB)),
+      _MoodData('sad', 'Sad', Icons.sentiment_dissatisfied, Color(0xFF9FA2D5)),
+      _MoodData('happy', 'Happy', Icons.sentiment_satisfied, Color(0xFF9AA272)),
+      _MoodData('excited', 'Excited', Icons.celebration, Color(0xFFE5CF7B)),
+      _MoodData('crying', 'Crying', Icons.sentiment_very_dissatisfied, Color(0xFF7BA2D5)),
+      _MoodData('angry', 'Angry', Icons.mood_bad, Color(0xFFE57373)),
     ];
 
     return Card(
@@ -214,7 +301,8 @@ class MoodCheckInPanel extends StatelessWidget {
                         padding: const EdgeInsets.only(right: 12),
                         child: MoodItem(
                           data: mood,
-                          onPressed: () => onMoodPressed(mood.label),
+                          isSelected: currentMood == mood.value,
+                          onPressed: () => onMoodPressed(mood.value),
                         ),
                       ),
                     )
@@ -233,10 +321,12 @@ class MoodItem extends StatelessWidget {
     super.key,
     required this.data,
     required this.onPressed,
+    this.isSelected = false,
   });
 
   final _MoodData data;
   final VoidCallback onPressed;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -245,10 +335,21 @@ class MoodItem extends StatelessWidget {
         InkWell(
           borderRadius: BorderRadius.circular(44),
           onTap: onPressed,
-          child: CircleAvatar(
-            radius: 42,
-            backgroundColor: data.color,
-            child: Icon(data.icon, color: Colors.white, size: 30),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: isSelected
+                  ? Border.all(color: Colors.white, width: 3)
+                  : null,
+              boxShadow: isSelected
+                  ? [BoxShadow(color: data.color.withValues(alpha: 0.5), blurRadius: 8)]
+                  : null,
+            ),
+            child: CircleAvatar(
+              radius: 42,
+              backgroundColor: data.color,
+              child: Icon(data.icon, color: Colors.white, size: 30),
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -266,22 +367,18 @@ class MoodItem extends StatelessWidget {
 }
 
 class _MoodData {
-  const _MoodData(this.label, this.icon, this.color);
+  const _MoodData(this.value, this.label, this.icon, this.color);
 
+  final String value;
   final String label;
   final IconData icon;
   final Color color;
 }
 
 class MedicationReminderPanel extends StatelessWidget {
-  const MedicationReminderPanel({
-    super.key,
-    required this.isChecked,
-    required this.onChanged,
-  });
+  const MedicationReminderPanel({super.key, this.medicine});
 
-  final bool isChecked;
-  final ValueChanged<bool?> onChanged;
+  final Medicine? medicine;
 
   @override
   Widget build(BuildContext context) {
@@ -298,7 +395,9 @@ class MedicationReminderPanel extends StatelessWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(
-                'Did you take your Medicine today?',
+                medicine != null
+                    ? 'Did you take your Medicine today?'
+                    : 'No medicines scheduled.',
                 style: GoogleFonts.inter(
                   fontSize: 24,
                   fontWeight: FontWeight.w500,
@@ -306,23 +405,38 @@ class MedicationReminderPanel extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Take this medicine at 3:00 PM',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: const Color(0xFF4A4A4A),
+            if (medicine != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Take at ${medicine!.scheduledTime}',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: const Color(0xFF4A4A4A),
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '2x Biogesic / 2x BioFlu / 3x Paracetamol',
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                color: const Color(0xFFE74E4E),
-                fontWeight: FontWeight.w500,
+              const SizedBox(height: 6),
+              Text(
+                '${medicine!.name}${medicine!.dosage != null ? ' — ${medicine!.dosage}' : ''}',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  color: medicine!.isOverdue
+                      ? Colors.red
+                      : const Color(0xFFE74E4E),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
+              if (medicine!.skipMessage != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  medicine!.skipMessage!,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: Colors.red,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ],
           ],
         ),
       ),
@@ -356,10 +470,7 @@ class QuickMessagePanel extends StatelessWidget {
           children: [
             RichText(
               text: TextSpan(
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: const Color(0xFF111111),
-                ),
+                style: GoogleFonts.inter(fontSize: 16, color: const Color(0xFF111111)),
                 children: const [
                   TextSpan(text: 'Send a quick message to '),
                   TextSpan(
@@ -419,11 +530,7 @@ class QuickMessagePanel extends StatelessWidget {
                     ),
                     child: Transform.rotate(
                       angle: -0.7854,
-                      child: const Icon(
-                        Icons.send_rounded,
-                        size: 26,
-                        color: Colors.white,
-                      ),
+                      child: const Icon(Icons.send_rounded, size: 26, color: Colors.white),
                     ),
                   ),
                 ),
@@ -437,10 +544,7 @@ class QuickMessagePanel extends StatelessWidget {
 }
 
 class _QuickPresetButton extends StatelessWidget {
-  const _QuickPresetButton({
-    required this.label,
-    required this.onPressed,
-  });
+  const _QuickPresetButton({required this.label, required this.onPressed});
 
   final String label;
   final VoidCallback onPressed;
@@ -455,17 +559,12 @@ class _QuickPresetButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFE94E4D),
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           elevation: 0,
         ),
         child: Text(
           label,
-          style: GoogleFonts.inter(
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-          ),
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16),
         ),
       ),
     );
@@ -491,11 +590,7 @@ class AppBottomNavBar extends StatelessWidget {
           color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(26),
           boxShadow: const [
-            BoxShadow(
-              color: Color(0x22000000),
-              blurRadius: 20,
-              offset: Offset(0, 8),
-            ),
+            BoxShadow(color: Color(0x22000000), blurRadius: 20, offset: Offset(0, 8)),
           ],
         ),
         child: ClipRRect(
@@ -509,8 +604,7 @@ class AppBottomNavBar extends StatelessWidget {
             selectedItemColor: const Color(0xFFE94E4D),
             unselectedItemColor: const Color(0xFF9F9F9F),
             selectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w700),
-            unselectedLabelStyle:
-                GoogleFonts.inter(fontWeight: FontWeight.w600),
+            unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
             items: const [
               BottomNavigationBarItem(
                 icon: Icon(Icons.home_outlined),
@@ -525,7 +619,7 @@ class AppBottomNavBar extends StatelessWidget {
               BottomNavigationBarItem(
                 icon: Icon(Icons.notifications_none),
                 activeIcon: Icon(Icons.notifications),
-                label: 'Notifications',
+                label: 'Reminders',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.settings_outlined),
