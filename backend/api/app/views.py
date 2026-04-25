@@ -368,6 +368,54 @@ class ReminderViewSet(viewsets.ModelViewSet):
         reminder_status.status = ReminderStatus.Status.DISMISSED
         reminder_status.save()
         return Response({"message": "Reminder dismissed.", "status": reminder_status.status})
+    
+    # GET /api/reminders/family/
+    @action(detail=False, methods=['get'], url_path='family')
+    def family_reminders(self, request):
+        user = request.user
+
+        if not user.family:
+            return Response(
+                {"error": "You are not part of a family."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Get all reminders assigned to family members
+        reminders = Reminder.objects.filter(
+            assigned_to__family=user.family
+        ).exclude(
+            assigned_to=user                # exclude your own reminders
+        ).select_related('creator').prefetch_related('assigned_to', 'statuses').distinct()
+
+        serializer = ReminderSerializer(reminders, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    # GET /api/reminders/user/{id}/
+    @action(detail=False, methods=['get'], url_path='user/(?P<user_id>[^/.]+)')
+    def user_reminders(self, request, user_id=None):
+        user = request.user
+
+        if not user.family:
+            return Response(
+                {"error": "You are not part of a family."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Make sure the target user exists and is in the same family
+        try:
+            target_user = CustomUser.objects.get(pk=user_id, family=user.family)
+        except CustomUser.DoesNotExist:
+            return Response(
+                {"error": "User not found in your family."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        reminders = Reminder.objects.filter(
+            assigned_to=target_user
+        ).select_related('creator').prefetch_related('assigned_to', 'statuses').distinct()
+
+        serializer = ReminderSerializer(reminders, many=True, context={'request': request})
+        return Response(serializer.data)
 
 class MedicineViewSet(viewsets.ModelViewSet):
     serializer_class = MedicineSerializer
