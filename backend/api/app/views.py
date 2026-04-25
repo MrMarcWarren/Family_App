@@ -1,9 +1,9 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import CustomUser, GeoTag
+from .models import CustomUser, Family, GeoTag
 from .serializers import (
-    RegisterSerializer, UserSerializer,
+    FamilyDetailSerializer, FamilySerializer, RegisterSerializer, UserSerializer,
     GeoTagSerializer, ChangePasswordSerializer
 )
 from app import serializers
@@ -145,3 +145,84 @@ class GeoTagViewSet(viewsets.ModelViewSet):
             user.geotag = None
             user.save()
             return Response({"message": "GeoTag removed successfully."}, status=status.HTTP_204_NO_CONTENT)
+
+class FamilyViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        # Use detailed serializer for retrieve, list; simple for others
+        if self.action in ['retrieve', 'list', 'members', 'emergency']:
+            return FamilyDetailSerializer
+        return FamilySerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff:
+            return Family.objects.all().prefetch_related('members')
+        if user.family:
+            return Family.objects.filter(pk=user.family.pk).prefetch_related('members')
+        return Family.objects.none()
+
+    def get_permissions(self):
+        if self.action in ['create', 'destroy']:
+            return [permissions.IsAdminUser()]
+        return [permissions.IsAuthenticated()]
+
+    # POST /api/families/{id}/add-member/
+    @action(detail=True, methods=['post'], url_path='add-member')
+    def add_member(self, request, pk=None):
+        family = self.get_object()
+        user = request.user
+
+        # Only adults or staff can add members
+        if not user.is_staff and not user.is_adult:
+            return Response(
+                {"error": "Only adults can add members."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        user_id = request.data.get('user_id')
+        try:
+            member = CustomUser.objects.get(pk=user_id)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        member.family = family
+        member.save()
+        return Response({"message": f"{member.username} added to {family.name}."})
+
+    # POST /api/families/{id}/remove-member/
+    @action(detail=True, methods=['post'], url_path='remove-member')
+    def remove_member(self, request, pk=None):
+        family = self.get_object()
+        user = request.user
+
+        if not user.is_staff and not user.is_adult:
+            return Response(
+                {"error": "Only adults can remove members."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        user_id = request.data.get('user_id')
+        try:
+            member = CustomUser.objects.get(pk=user_id, family=family)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User not found in this family."}, status=status.HTTP_404_NOT_FOUND)
+
+        member.family = None
+        member.save()
+        return Response({"message": f"{member.username} removed from {family.name}."})
+
+    # GET /api/families/{id}/members/
+    @action(detail=True, methods=['get'], url_path='members')
+    def members(self, request, pk=None):
+        family = self.get_object()
+        members = family.members.all().select_related('geotag')
+        serializer = FamilyMemberSerializer(members, many=True)
+        return Response(serializer.data)
+
+    # GET /api/families/{id}/emergency/
+    @action(detail=True, methods=['get'], url_path='emergency')
+    def emergency(self, request, pk=None):
+        family = self.get_object()
+        members = family.members.filter(in_emergency=True).select_related('geotag')
+        serializer = FamilyMemberSerializer(members, many=True)
+        return Response(serializer.data)

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import CustomUser, GeoTag
+from .models import CustomUser, Family, GeoTag
 
 class GeoTagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -9,9 +9,51 @@ class GeoTagSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
-class UserSerializer(serializers.ModelSerializer):
-    mood_display = serializers.CharField(source='get_mood_display', read_only=True)  # renamed
+class FamilySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Family
+        fields = ['id']                 # ← only id
+        read_only_fields = ['id']
+
+
+class FamilyDetailSerializer(serializers.ModelSerializer):
+    """Used by admin or when fetching full family info"""
+    members = serializers.SerializerMethodField()
+    total_members = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Family
+        fields = ['id', 'name', 'total_members', 'members', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_members(self, obj):
+        members = obj.members.all().select_related('geotag')
+        return FamilyMemberSerializer(members, many=True).data
+
+    def get_total_members(self, obj):
+        return obj.members.count()
+
+
+class FamilyMemberSerializer(serializers.ModelSerializer):
     geotag = GeoTagSerializer(read_only=True)
+
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username', 'first_name', 'last_name', 'phone', 'mood', 'in_emergency', 'is_adult', 'geotag']
+        read_only_fields = fields
+
+
+class UserSerializer(serializers.ModelSerializer):
+    mood_display = serializers.CharField(source='get_mood_display', read_only=True)
+    geotag = GeoTagSerializer(read_only=True)
+    family = FamilySerializer(read_only=True)               # ← shows only id
+    family_id = serializers.PrimaryKeyRelatedField(         # ← allows setting family by id
+        queryset=Family.objects.all(),
+        source='family',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = CustomUser
@@ -19,8 +61,10 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email',
             'first_name', 'last_name',
             'phone', 'birthday',
-            'mood', 'mood_display',        # renamed from status/status_display
-            'in_emergency', 'geotag',
+            'mood', 'mood_display',
+            'in_emergency', 'is_adult',
+            'geotag',
+            'family', 'family_id',
             'date_joined'
         ]
         read_only_fields = ['id', 'date_joined']
@@ -37,10 +81,12 @@ class RegisterSerializer(serializers.ModelSerializer):
             'id', 'username', 'email',
             'first_name', 'last_name',
             'phone', 'birthday',
-            'mood',                        # renamed from status
-            'in_emergency', 'geotag',
+            'mood', 'in_emergency', 'is_adult',
+            'family',
+            'geotag',
             'password', 'password2'
         ]
+
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password": "Passwords do not match."})
@@ -71,3 +117,4 @@ class ChangePasswordSerializer(serializers.Serializer):
         if attrs['new_password'] != attrs['new_password2']:
             raise serializers.ValidationError({"new_password": "Passwords do not match."})
         return attrs
+
