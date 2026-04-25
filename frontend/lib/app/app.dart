@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../features/auth/presentation/login_page.dart';
+import '../features/dashboard/presentation/dashboard_page.dart';
 
 class FamilyApp extends StatelessWidget {
   const FamilyApp({super.key});
@@ -25,7 +25,7 @@ class FamilyApp extends StatelessWidget {
           bodyMedium: TextStyle(color: Colors.white),
         ),
       ),
-      home: const LoginPage(),
+      home: const DashboardPage(),
     );
   }
 }
