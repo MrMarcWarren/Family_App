@@ -57,3 +57,40 @@ class Note(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+class Reminder(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        DONE = 'done', 'Done'
+        DISMISSED = 'dismissed', 'Dismissed'
+
+    creator = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='created_reminders')
+    assigned_to = models.ManyToManyField(CustomUser, related_name='reminders')   # ← ManyToMany
+    title = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    remind_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} by {self.creator.username}"
+
+    class Meta:
+        ordering = ['remind_at']
+
+class ReminderStatus(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        DONE = 'done', 'Done'
+        DISMISSED = 'dismissed', 'Dismissed'
+
+    reminder = models.ForeignKey(Reminder, on_delete=models.CASCADE, related_name='statuses')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='reminder_statuses')
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['reminder', 'user']  # one status per user per reminder
+
+    def __str__(self):
+        return f"{self.reminder.title} → {self.user.username}: {self.status}"

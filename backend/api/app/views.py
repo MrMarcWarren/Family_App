@@ -1,10 +1,13 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import CustomUser, Family, GeoTag
+from .models import CustomUser, GeoTag, Family, Note, Reminder, ReminderStatus
 from .serializers import (
-    FamilyDetailSerializer, FamilySerializer, RegisterSerializer, UserSerializer,
-    GeoTagSerializer, ChangePasswordSerializer
+    RegisterSerializer, UserSerializer,
+    GeoTagSerializer, ChangePasswordSerializer,
+    FamilySerializer, FamilyDetailSerializer,
+    FamilyMemberSerializer, NoteSerializer,
+    ReminderSerializer, ReminderStatusSerializer
 )
 from app import serializers
 
@@ -227,14 +230,6 @@ class FamilyViewSet(viewsets.ModelViewSet):
         serializer = FamilyMemberSerializer(members, many=True)
         return Response(serializer.data)
 
-from .models import CustomUser, GeoTag, Family, Note
-from .serializers import (
-    RegisterSerializer, UserSerializer,
-    GeoTagSerializer, ChangePasswordSerializer,
-    FamilySerializer, FamilyDetailSerializer,
-    FamilyMemberSerializer, NoteSerializer
-)
-
 class NoteViewSet(viewsets.ModelViewSet):
     serializer_class = NoteSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -291,3 +286,83 @@ class NoteViewSet(viewsets.ModelViewSet):
         notes = Note.objects.filter(receiver=request.user, is_read=False).select_related('sender')
         serializer = NoteSerializer(notes, many=True, context={'request': request})
         return Response(serializer.data)
+
+class ReminderViewSet(viewsets.ModelViewSet):
+    serializer_class = ReminderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Reminder.objects.filter(
+            creator=user
+        ) | Reminder.objects.filter(
+            assigned_to=user
+        ).select_related('creator').prefetch_related('assigned_to', 'statuses')
+
+    def perform_create(self, serializer):
+        serializer.save(creator=self.request.user)
+
+    # GET /api/reminders/mine/
+    @action(detail=False, methods=['get'], url_path='mine')
+    def mine(self, request):
+        reminders = Reminder.objects.filter(
+            assigned_to=request.user
+        ).select_related('creator').prefetch_related('assigned_to', 'statuses')
+        serializer = ReminderSerializer(reminders, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    # GET /api/reminders/created/
+    @action(detail=False, methods=['get'], url_path='created')
+    def created(self, request):
+        reminders = Reminder.objects.filter(
+            creator=request.user
+        ).prefetch_related('assigned_to', 'statuses')
+        serializer = ReminderSerializer(reminders, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    # GET /api/reminders/pending/
+    @action(detail=False, methods=['get'], url_path='pending')
+    def pending(self, request):
+        reminders = Reminder.objects.filter(
+            assigned_to=request.user,
+            statuses__user=request.user,
+            statuses__status=ReminderStatus.Status.PENDING
+        ).prefetch_related('assigned_to', 'statuses')
+        serializer = ReminderSerializer(reminders, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    # PATCH /api/reminders/{id}/done/
+    @action(detail=True, methods=['patch'], url_path='done')
+    def mark_done(self, request, pk=None):
+        reminder = self.get_object()
+        reminder_status = ReminderStatus.objects.filter(
+            reminder=reminder, user=request.user
+        ).first()
+
+        if not reminder_status:
+            return Response(
+                {"error": "This reminder is not assigned to you."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        reminder_status.status = ReminderStatus.Status.DONE
+        reminder_status.save()
+        return Response({"message": "Reminder marked as done.", "status": reminder_status.status})
+
+    # PATCH /api/reminders/{id}/dismiss/
+    @action(detail=True, methods=['patch'], url_path='dismiss')
+    def dismiss(self, request, pk=None):
+        reminder = self.get_object()
+        reminder_status = ReminderStatus.objects.filter(
+            reminder=reminder, user=request.user
+        ).first()
+
+        if not reminder_status:
+            return Response(
+                {"error": "This reminder is not assigned to you."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        reminder_status.status = ReminderStatus.Status.DISMISSED
+        reminder_status.save()
+        return Response({"message": "Reminder dismissed.", "status": reminder_status.status})

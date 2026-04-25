@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser, GeoTag, Family, Note
+from .models import CustomUser, GeoTag, Family, Note, Reminder, ReminderStatus
 
 
 @admin.register(Family)
@@ -39,3 +39,15 @@ class NoteAdmin(admin.ModelAdmin):
     list_display = ['sender', 'receiver', 'content', 'is_read', 'created_at']
     list_filter = ['is_read']
     search_fields = ['sender__username', 'receiver__username', 'content']
+
+@admin.register(Reminder)
+class ReminderAdmin(admin.ModelAdmin):
+    list_display = ['title', 'creator', 'remind_at', 'created_at']
+    search_fields = ['title', 'creator__username']
+    filter_horizontal = ['assigned_to']     # ← nice UI for ManyToMany in admin
+
+@admin.register(ReminderStatus)
+class ReminderStatusAdmin(admin.ModelAdmin):
+    list_display = ['reminder', 'user', 'status', 'updated_at']
+    list_filter = ['status']
+    search_fields = ['reminder__title', 'user__username']

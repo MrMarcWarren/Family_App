@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import CustomUser, Family, GeoTag, Note
+from .models import CustomUser, Family, GeoTag, Note, Reminder, ReminderStatus
 
 class GeoTagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -144,3 +144,82 @@ class NoteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("You can only send notes to family members.")
 
         return receiver
+
+class ReminderStatusSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField(read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = ReminderStatus
+        fields = ['user', 'status', 'status_display', 'updated_at']
+
+
+class ReminderSerializer(serializers.ModelSerializer):
+    creator = serializers.StringRelatedField(read_only=True)
+    assigned_to = serializers.StringRelatedField(many=True, read_only=True)
+    assigned_to_ids = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.all(),
+        many=True,
+        write_only=True,
+        source='assigned_to'
+    )
+    statuses = ReminderStatusSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Reminder
+        fields = [
+            'id', 'creator',
+            'assigned_to', 'assigned_to_ids',
+            'title', 'description', 'remind_at',
+            'statuses',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'creator', 'created_at', 'updated_at']
+
+    def validate_assigned_to_ids(self, assigned_to_list):
+        creator = self.context['request'].user
+
+        for member in assigned_to_list:
+            # Can assign to yourself
+            if member == creator:
+                continue
+            # Must be in the same family
+            if member.family != creator.family or creator.family is None:
+                raise serializers.ValidationError(
+                    f"{member.username} is not a member of your family."
+                )
+
+        return assigned_to_list
+
+    def create(self, validated_data):
+        assigned_to_list = validated_data.pop('assigned_to', [])
+        reminder = Reminder.objects.create(**validated_data)
+
+        # Add assignees and create a status for each
+        for user in assigned_to_list:
+            reminder.assigned_to.add(user)
+            ReminderStatus.objects.create(reminder=reminder, user=user)
+
+        return reminder
+
+    def update(self, instance, validated_data):
+        assigned_to_list = validated_data.pop('assigned_to', None)
+        instance.title = validated_data.get('title', instance.title)
+        instance.description = validated_data.get('description', instance.description)
+        instance.remind_at = validated_data.get('remind_at', instance.remind_at)
+        instance.save()
+
+        if assigned_to_list is not None:
+            # Remove statuses for removed assignees
+            removed = instance.assigned_to.exclude(pk__in=[u.pk for u in assigned_to_list])
+            ReminderStatus.objects.filter(reminder=instance, user__in=removed).delete()
+
+            # Add statuses for new assignees
+            for user in assigned_to_list:
+                instance.assigned_to.add(user)
+                ReminderStatus.objects.get_or_create(reminder=instance, user=user)
+
+            # Remove old assignees
+            instance.assigned_to.set(assigned_to_list)
+
+        return instance
