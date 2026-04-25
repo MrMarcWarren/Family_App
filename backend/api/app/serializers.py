@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import CustomUser, Family, GeoTag, Note, Reminder, ReminderStatus
+from .models import CustomUser, Family, GeoTag, Medicine, Note, Reminder, ReminderStatus
 
 class GeoTagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -204,3 +204,36 @@ class ReminderSerializer(serializers.ModelSerializer):
             instance.assigned_to.set(assigned_to_list)
 
         return instance
+
+class MedicineSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField(read_only=True)
+    is_overdue = serializers.SerializerMethodField()
+    skip_message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Medicine
+        fields = [
+            'id', 'user', 'name', 'dosage',
+            'scheduled_time', 'is_active',
+            'last_taken_at', 'is_overdue',
+            'skip_message', 'created_at'
+        ]
+        read_only_fields = ['id', 'user', 'last_taken_at', 'created_at']
+
+    def get_is_overdue(self, obj):
+        from django.utils import timezone
+        import datetime
+        now = timezone.now()
+        scheduled_dt = timezone.make_aware(
+            datetime.datetime.combine(now.date(), obj.scheduled_time)
+        )
+        # Overdue if past scheduled time and not taken today
+        if obj.last_taken_at:
+            return obj.last_taken_at.date() < now.date() and now > scheduled_dt
+        return now > scheduled_dt
+
+    def get_skip_message(self, obj):
+        if self.get_is_overdue(obj):
+            time_str = obj.scheduled_time.strftime("%I:%M %p")
+            return f"You were supposed to take {obj.name} at {time_str}"
+        return None

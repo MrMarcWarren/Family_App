@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser, GeoTag, Family, Note, Reminder, ReminderStatus
+from .models import CustomUser, GeoTag, Family, Medicine, Note, Reminder, ReminderStatus
 
 
 @admin.register(Family)
@@ -50,3 +50,9 @@ class ReminderStatusAdmin(admin.ModelAdmin):
     list_display = ['reminder', 'user', 'status', 'updated_at']
     list_filter = ['status']
     search_fields = ['reminder__title', 'user__username']
+
+@admin.register(Medicine)
+class MedicineAdmin(admin.ModelAdmin):
+    list_display = ['name', 'user', 'dosage', 'scheduled_time', 'is_active', 'last_taken_at']
+    list_filter = ['is_active']
+    search_fields = ['name', 'user__username']

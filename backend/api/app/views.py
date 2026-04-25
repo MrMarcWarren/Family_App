@@ -1,9 +1,9 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import CustomUser, GeoTag, Family, Note, Reminder, ReminderStatus
+from .models import CustomUser, GeoTag, Family, Medicine, Note, Reminder, ReminderStatus
 from .serializers import (
-    RegisterSerializer, UserSerializer,
+    MedicineSerializer, RegisterSerializer, UserSerializer,
     GeoTagSerializer, ChangePasswordSerializer,
     FamilySerializer, FamilyDetailSerializer,
     FamilyMemberSerializer, NoteSerializer,
@@ -339,3 +339,24 @@ class ReminderViewSet(viewsets.ModelViewSet):
         reminder_status.status = ReminderStatus.Status.DISMISSED
         reminder_status.save()
         return Response({"message": "Reminder dismissed.", "status": reminder_status.status})
+
+class MedicineViewSet(viewsets.ModelViewSet):
+    serializer_class = MedicineSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Medicine.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    # PATCH /api/medicines/{id}/take/
+    @action(detail=True, methods=['patch'], url_path='take')
+    def take(self, request, pk=None):
+        medicine = self.get_object()
+        medicine.last_taken_at = timezone.now()
+        medicine.save()
+        return Response({
+            "message": f"✅ {medicine.name} marked as taken.",
+            "last_taken_at": medicine.last_taken_at
+        })

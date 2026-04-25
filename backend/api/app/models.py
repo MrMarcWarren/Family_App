@@ -92,3 +92,18 @@ class ReminderStatus(models.Model):
 
     def __str__(self):
         return f"{self.reminder.title} → {self.user.username}: {self.status}"
+
+class Medicine(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='medicines')
+    name = models.CharField(max_length=100)
+    dosage = models.CharField(max_length=100, blank=True, null=True)  # e.g. "500mg"
+    scheduled_time = models.TimeField()                               # e.g. 15:00 for 3pm
+    is_active = models.BooleanField(default=True)
+    last_taken_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.name} at {self.scheduled_time}"
+
+    class Meta:
+        ordering = ['scheduled_time']
