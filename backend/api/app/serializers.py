@@ -46,8 +46,8 @@ class FamilyMemberSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     mood_display = serializers.CharField(source='get_mood_display', read_only=True)
     geotag = GeoTagSerializer(read_only=True)
-    family = FamilySerializer(read_only=True)               # ← shows only id
-    family_id = serializers.PrimaryKeyRelatedField(         # ← allows setting family by id
+    family = FamilySerializer(read_only=True)
+    family_id = serializers.PrimaryKeyRelatedField(
         queryset=Family.objects.all(),
         source='family',
         write_only=True,
@@ -61,14 +61,14 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email',
             'first_name', 'last_name',
             'phone', 'birthday',
-            'mood', 'mood_display',
+            'mood', 'mood_display', 'mood_updated_at',
             'in_emergency', 'is_adult',
+            'checked_on',                                # ← no checked_on_by
             'geotag',
             'family', 'family_id',
             'date_joined'
         ]
-        read_only_fields = ['id', 'date_joined']
-
+        read_only_fields = ['id', 'date_joined', 'mood_updated_at', 'checked_on']
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])

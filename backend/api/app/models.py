@@ -1,3 +1,6 @@
+
+from django.utils import timezone
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -37,8 +40,10 @@ class CustomUser(AbstractUser):
     phone = models.CharField(max_length=20, blank=True, null=True)
     birthday = models.DateField(blank=True, null=True)
     mood = models.CharField(max_length=10, choices=Mood.choices, default=Mood.HAPPY)
+    mood_updated_at = models.DateTimeField(default=timezone.now)
     in_emergency = models.BooleanField(default=False)
-    is_adult = models.BooleanField(default=False)          # ← replaces role
+    is_adult = models.BooleanField(default=False)
+    checked_on = models.BooleanField(default=False)                  # ← no checked_on_by
     geotag = models.OneToOneField(GeoTag, on_delete=models.SET_NULL, null=True, blank=True, related_name='user')
     family = models.ForeignKey(Family, on_delete=models.SET_NULL, null=True, blank=True, related_name='members')
 

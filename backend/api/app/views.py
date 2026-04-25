@@ -93,7 +93,36 @@ class UserViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['patch'], url_path='check-on')
+    def check_on(self, request, pk=None):
+        target_user = self.get_object()
+        requester = request.user
 
+        if target_user == requester:
+            return Response(
+                {"error": "You cannot check on yourself."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if target_user.family != requester.family or requester.family is None:
+            return Response(
+                {"error": "You can only check on family members."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        target_user.checked_on = True
+        target_user.save()
+
+        return Response({"message": "Checked on successfully."})   # ← no info revealed
+
+
+    @action(detail=False, methods=['patch'], url_path='dismiss-check-on')
+    def dismiss_check_on(self, request):
+        user = request.user
+        user.checked_on = False
+        user.save()
+        return Response({"message": "Check-on dismissed.", "checked_on": False})
 
 class GeoTagViewSet(viewsets.ModelViewSet):
     serializer_class = GeoTagSerializer
