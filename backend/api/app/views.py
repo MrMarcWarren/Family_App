@@ -251,6 +251,26 @@ class FamilyViewSet(viewsets.ModelViewSet):
         serializer = FamilyMemberSerializer(members, many=True)
         return Response(serializer.data)
 
+    # POST /api/families/{id}/join/
+    @action(detail=True, methods=['post'], url_path='join')
+    def join(self, request, pk=None):
+        user = request.user
+
+        if user.family is not None:
+            return Response(
+                {"error": "You are already in a family. Leave your current family first."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            family = Family.objects.get(pk=pk)
+        except Family.DoesNotExist:
+            return Response({"error": "Family not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        user.family = family
+        user.save()
+        return Response({"message": f"You have joined {family.name}."})
+
     # GET /api/families/{id}/emergency/
     @action(detail=True, methods=['get'], url_path='emergency')
     def emergency(self, request, pk=None):
