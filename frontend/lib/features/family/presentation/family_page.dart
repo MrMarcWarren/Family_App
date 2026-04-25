@@ -41,6 +41,37 @@ class _FamilyPageState extends State<FamilyPage> {
   }
 }
 
+void _showFamilyCheckInModal(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogContext) {
+      return FamilyCheckInModal(
+        name: 'Name Name Name',
+        statusText: 'Status: Feeling Happy (2hrs ago)',
+        onCheckOnThem: () {},
+        onMessage: () {},
+        onCall: () {},
+      );
+    },
+  );
+}
+
+void _showFamilyProfileModal(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogContext) {
+      return FamilyProfileModal(
+        name: 'Name Name Name',
+        statusText: 'Status: Feeling Happy (2hrs ago)',
+        onCheckOnThem: () {},
+        onAddReminder: () {},
+      );
+    },
+  );
+}
+
 class FamilyHeader extends StatelessWidget implements PreferredSizeWidget {
   const FamilyHeader({super.key});
 
@@ -62,12 +93,15 @@ class FamilyHeader extends StatelessWidget implements PreferredSizeWidget {
             height: 32,
           ),
           const SizedBox(width: 8),
-          Text(
-            'TAHANAN',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.1,
-              fontSize: 18,
+          Flexible(
+            child: Text(
+              'TAHANAN',
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+                fontSize: 18,
+              ),
             ),
           ),
         ],
@@ -95,9 +129,9 @@ class FamilyMembersPanel extends StatelessWidget {
     final memberColors = <Color>[
       const Color(0xFF9FA2D5),
       const Color(0xFFE74E4E),
+      const Color(0xFFE74E4E),
       const Color(0xFFF0C94D),
       const Color(0xFF86A9D8),
-      const Color(0xFFB7B7B7),
     ];
 
     return Card(
@@ -125,18 +159,21 @@ class FamilyMembersPanel extends StatelessWidget {
                 return Expanded(
                   child: Column(
                     children: [
-                      Stack(
-                        alignment: Alignment.bottomLeft,
-                        children: [
-                          const CircleAvatar(
-                            radius: 22,
-                            backgroundColor: Color(0xFFE0E0E0),
-                          ),
-                          CircleAvatar(
-                            radius: 9,
-                            backgroundColor: memberColors[index],
-                          ),
-                        ],
+                      GestureDetector(
+                        onTap: () => _showFamilyProfileModal(context),
+                        child: Stack(
+                          alignment: Alignment.bottomLeft,
+                          children: [
+                            const CircleAvatar(
+                              radius: 22,
+                              backgroundColor: Color(0xFFD5D5D5),
+                            ),
+                            CircleAvatar(
+                              radius: 9,
+                              backgroundColor: memberColors[index],
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Text(
@@ -172,24 +209,33 @@ class FamilyMapPanel extends StatelessWidget {
         point: const LatLng(14.5764, 121.0851),
         width: 44,
         height: 44,
-        child: const CircleAvatar(
-          backgroundColor: Colors.white,
+        child: GestureDetector(
+          onTap: () => _showFamilyProfileModal(context),
+          child: const CircleAvatar(
+            backgroundColor: Colors.white,
+          ),
         ),
       ),
       Marker(
         point: const LatLng(14.5782, 121.0837),
         width: 44,
         height: 44,
-        child: const CircleAvatar(
-          backgroundColor: Colors.white,
+        child: GestureDetector(
+          onTap: () => _showFamilyProfileModal(context),
+          child: const CircleAvatar(
+            backgroundColor: Colors.white,
+          ),
         ),
       ),
       Marker(
         point: const LatLng(14.5749, 121.0869),
         width: 44,
         height: 44,
-        child: const CircleAvatar(
-          backgroundColor: Colors.white,
+        child: GestureDetector(
+          onTap: () => _showFamilyProfileModal(context),
+          child: const CircleAvatar(
+            backgroundColor: Colors.white,
+          ),
         ),
       ),
     ];
@@ -234,7 +280,7 @@ class FamilyCheckInPanel extends StatelessWidget {
       return _CheckInEntry(
         name: 'Nickname of Family',
         lastCheckedIn: 'Last Checked in 8:15pm',
-        onPressed: () {},
+        onPressed: () => _showFamilyCheckInModal(context),
       );
     });
 
@@ -342,6 +388,243 @@ class _CheckInEntry extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class FamilyProfileModal extends StatelessWidget {
+  const FamilyProfileModal({
+    super.key,
+    required this.name,
+    required this.statusText,
+    required this.onCheckOnThem,
+    required this.onAddReminder,
+  });
+
+  final String name;
+  final String statusText;
+  final VoidCallback onCheckOnThem;
+  final VoidCallback onAddReminder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+      backgroundColor: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircleAvatar(
+              radius: 24,
+              backgroundColor: Color(0xFFD9D9D9),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              name,
+              style: GoogleFonts.inter(
+                fontSize: 40,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF3F3F3F),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              statusText,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF9B9B9B),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 120,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE4E4E4),
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 70,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE4E4E4),
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _ModalActionButton(
+              label: 'Check on them',
+              onPressed: onCheckOnThem,
+            ),
+            const SizedBox(height: 8),
+            _ModalActionButton(
+              label: 'Add Reminder',
+              onPressed: onAddReminder,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class FamilyCheckInModal extends StatelessWidget {
+  const FamilyCheckInModal({
+    super.key,
+    required this.name,
+    required this.statusText,
+    required this.onCheckOnThem,
+    required this.onMessage,
+    required this.onCall,
+  });
+
+  final String name;
+  final String statusText;
+  final VoidCallback onCheckOnThem;
+  final VoidCallback onMessage;
+  final VoidCallback onCall;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+      backgroundColor: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.white,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              name,
+              style: GoogleFonts.inter(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF3F3F3F),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              statusText,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF9B9B9B),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 70,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE4E4E4),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _ModalActionButton(
+              label: 'Check on them',
+              onPressed: onCheckOnThem,
+            ),
+            const SizedBox(height: 8),
+            _ModalActionButton(
+              label: 'Message',
+              onPressed: onMessage,
+            ),
+            const SizedBox(height: 8),
+            _ModalActionButton(
+              label: 'Call',
+              onPressed: onCall,
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFE94E4D), width: 1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Gentle Guide',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF2D2D2D),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '"Try to invite for a drink, send a Meme, try to\n'
+                    'cheer up the person"',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF8E8E8E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ModalActionButton extends StatelessWidget {
+  const _ModalActionButton({
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 42,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFE94E4D),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          elevation: 0,
+          textStyle: GoogleFonts.inter(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        child: Text(label),
       ),
     );
   }
