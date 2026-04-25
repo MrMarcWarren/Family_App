@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../dashboard/presentation/dashboard_page.dart';
+import '../../family/presentation/family_page.dart';
+
 class ReminderItemData {
   const ReminderItemData({
     required this.title,
@@ -99,8 +102,19 @@ class _ReminderPageState extends State<ReminderPage> {
       bottomNavigationBar: ReminderBottomNavBar(
         currentIndex: selectedTabIndex,
         onTap: (index) {
-          if (index == 1 && Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
+          if (index == selectedTabIndex) {
+            return;
+          }
+          if (index == 0) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const DashboardPage()),
+            );
+            return;
+          }
+          if (index == 1) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const FamilyPage()),
+            );
             return;
           }
           setState(() {

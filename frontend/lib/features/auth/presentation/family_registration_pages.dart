@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../dashboard/presentation/dashboard_page.dart';
 import 'widgets/tahanan_logo.dart';
 
 class JoinFamilyPage extends StatelessWidget {
@@ -15,6 +16,7 @@ class JoinFamilyPage extends StatelessWidget {
       includeFamilyCode: true,
       actionLabel: 'Join Family',
       familyCodeLabel: 'Family Code',
+      navigateToDashboardOnSubmit: false,
     );
   }
 }
@@ -29,6 +31,7 @@ class CreateFamilyPage extends StatelessWidget {
       description: 'Set up a new family space and invite others to join later.',
       includeFamilyCode: false,
       actionLabel: 'Register Account',
+      navigateToDashboardOnSubmit: true,
     );
   }
 }
@@ -39,6 +42,7 @@ class _FamilyRegistrationPage extends StatefulWidget {
     required this.description,
     required this.includeFamilyCode,
     required this.actionLabel,
+    required this.navigateToDashboardOnSubmit,
     this.familyCodeLabel,
   });
 
@@ -46,6 +50,7 @@ class _FamilyRegistrationPage extends StatefulWidget {
   final String description;
   final bool includeFamilyCode;
   final String actionLabel;
+  final bool navigateToDashboardOnSubmit;
   final String? familyCodeLabel;
 
   @override
@@ -210,7 +215,16 @@ class _FamilyRegistrationPageState extends State<_FamilyRegistrationPage> {
                       SizedBox(
                         height: 46,
                         child: ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            if (widget.navigateToDashboardOnSubmit) {
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                  builder: (context) => const DashboardPage(),
+                                ),
+                                (route) => false,
+                              );
+                            }
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: const Color(0xFFF63C3C),

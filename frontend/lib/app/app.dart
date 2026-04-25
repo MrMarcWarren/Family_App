@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../features/family/presentation/family_page.dart';
+import '../features/auth/presentation/login_page.dart';
 
 class FamilyApp extends StatelessWidget {
   const FamilyApp({super.key});
@@ -29,7 +29,7 @@ class FamilyApp extends StatelessWidget {
         ),
         fontFamily: GoogleFonts.inter().fontFamily,
       ),
-      home: const FamilyPage(),
+      home: const LoginPage(),
     );
   }
 }

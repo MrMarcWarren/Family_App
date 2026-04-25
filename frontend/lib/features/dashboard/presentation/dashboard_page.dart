@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../family/presentation/family_page.dart';
+import '../../reminders/presentation/reminder_page.dart';
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -97,6 +100,21 @@ class _DashboardPageState extends State<DashboardPage> {
       bottomNavigationBar: AppBottomNavBar(
         currentIndex: selectedTabIndex,
         onTap: (index) {
+          if (index == selectedTabIndex) {
+            return;
+          }
+          if (index == 1) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const FamilyPage()),
+            );
+            return;
+          }
+          if (index == 2) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const ReminderPage()),
+            );
+            return;
+          }
           setState(() {
             selectedTabIndex = index;
           });
