@@ -25,3 +25,5 @@ family dinners
 birthdays
 fiestas
 important events
+
+<img width="4536" height="2946" alt="image" src="https://github.com/user-attachments/assets/4c7a0fba-ef62-46ab-9cef-305e21c564d8" />
